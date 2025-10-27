@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Test/Sample files
+sample_*.pdf
+sample_*.csv
+*.csv
+
+# Documentation (optional - comment out if you want to include)
+P2_*.md
+PROJECT_ANALYSIS.md
+QUICK_FIXES.md
+COMPLETE_PROJECT_ANALYSIS.md
+EXECUTIVE_SUMMARY.md
