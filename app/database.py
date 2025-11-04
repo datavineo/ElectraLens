@@ -9,11 +9,10 @@ load_dotenv()
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./voters.db')
 
-# For Vercel deployment, default to SQLite if PostgreSQL URL is provided
-# This avoids psycopg2 build issues on Vercel
+# For Vercel deployment, use in-memory SQLite to avoid file system issues
 if os.getenv('VERCEL') or os.getenv('VERCEL_ENV'):
-    # Use SQLite for Vercel deployment to avoid build issues
-    DATABASE_URL = 'sqlite:///./voters.db'
+    # Use in-memory SQLite for Vercel deployment (no file system writes)
+    DATABASE_URL = 'sqlite:///:memory:'
 
 engine = create_engine(
     DATABASE_URL,
