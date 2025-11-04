@@ -24,9 +24,11 @@ This application is configured for deployment on Vercel with the following struc
    - Output Directory: Leave empty
    - Install Command: `pip install -r requirements.txt`
 
-3. **Environment Variables** (if needed):
-   - `DATABASE_URL`: Your production database URL
+3. **Environment Variables**:
+   Set these in Vercel's Environment Variables section:
+   - `DATABASE_URL`: Your PostgreSQL database URL
    - `ALLOWED_ORIGINS`: Your frontend URL
+   - `LOG_LEVEL`: INFO
 
 4. **Deploy**: Click "Deploy"
 
@@ -67,10 +69,31 @@ Once deployed, your API will be available at:
 - **Documentation**: `https://your-app.vercel.app/api/docs`
 - **Health Check**: `https://your-app.vercel.app/health`
 
+### Environment Configuration
+
+#### Local Development
+1. Copy the environment template:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Update `.env` with your PostgreSQL database URL:
+   ```
+   DATABASE_URL=postgresql://neondb_owner:npg_aTq54cvMEkiz@ep-orange-sea-ad3n3cx8-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+   ALLOWED_ORIGINS=http://localhost:8501
+   LOG_LEVEL=INFO
+   ```
+
+#### Vercel Production
+Set these environment variables in Vercel Dashboard:
+- `DATABASE_URL`: Your PostgreSQL connection string
+- `ALLOWED_ORIGINS`: Your frontend domain
+- `LOG_LEVEL`: INFO
+
 ### Production Considerations
 
-1. **Database**: Replace SQLite with PostgreSQL for production
-2. **Environment Variables**: Set up proper environment variables
+1. **Database**: PostgreSQL configured via environment variables
+2. **Environment Variables**: Use .env for local, Vercel dashboard for production
 3. **CORS**: Configure allowed origins for your frontend
 4. **Rate Limiting**: Already configured with slowapi
 5. **Logging**: Configure production logging
