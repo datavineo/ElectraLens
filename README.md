@@ -1,6 +1,6 @@
-# Voter Analysis Dashboard (MVP)
+# ElectraLens - Voter Management System
 
-This project provides a minimal Voter Analysis Dashboard: PDF → CSV extraction, FastAPI backend with CRUD, and a Streamlit frontend with charts and forms.
+This project provides a comprehensive Voter Management System with FastAPI backend, PostgreSQL/SQLite database, and a Streamlit frontend with advanced filtering and analytics.
 
 Quick start (Windows PowerShell):
 
