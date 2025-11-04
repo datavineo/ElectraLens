@@ -17,9 +17,9 @@ if __name__ == "__main__":
     if 'VERCEL_ENV' in os.environ:
         del os.environ['VERCEL_ENV']
     
-    # Run the API
+    # Run the main API
     uvicorn.run(
-        "app.main_vercel:app",
+        "app.main:app",
         host="0.0.0.0",
         port=8000,
         reload=True

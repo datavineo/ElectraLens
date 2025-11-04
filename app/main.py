@@ -5,7 +5,6 @@ from . import models, schemas, crud
 from .database import engine, get_db
 from .logging_config import setup_logging, logger
 import os
-from extract.extractor import process_uploaded_pdf, load_csv_into_db
 import time
 from starlette.requests import Request
 from slowapi import Limiter
@@ -13,6 +12,21 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+
+# Conditional import for extractor (only for non-Vercel environments)
+if not os.getenv('VERCEL'):
+    try:
+        from extract.extractor import process_uploaded_pdf, load_csv_into_db
+    except ImportError:
+        def process_uploaded_pdf(*args, **kwargs):
+            return {"error": "PDF processing not available"}
+        def load_csv_into_db(*args, **kwargs):
+            return {"error": "CSV processing not available"}
+else:
+    def process_uploaded_pdf(*args, **kwargs):
+        return {"error": "PDF processing not available in serverless environment"}
+    def load_csv_into_db(*args, **kwargs):
+        return {"error": "CSV processing not available in serverless environment"}
 
 # Load environment variables
 load_dotenv()
