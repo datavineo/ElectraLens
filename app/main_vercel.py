@@ -23,11 +23,17 @@ app.add_middleware(
 # Basic endpoints
 @app.get("/")
 async def root():
-    return {"message": "ElectraLens API", "version": "1.0.0"}
+    return {
+        "message": "ElectraLens API", 
+        "version": "1.0.0",
+        "docs": "/docs",
+        "voters": "/voters",
+        "health": "/health"
+    }
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "database": "sqlite"}
+    return {"status": "healthy", "database": "sqlite", "environment": "vercel"}
 
 # Voter CRUD endpoints
 @app.get("/voters", response_model=List[schemas.Voter])
