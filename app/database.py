@@ -11,10 +11,10 @@ DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./voters.db')
 
 # Environment-specific database configuration
 if os.getenv('VERCEL') or os.getenv('VERCEL_ENV'):
-    # Production: Use PostgreSQL on Vercel
-    DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://neondb_owner:npg_aTq54cvMEkiz@ep-orange-sea-ad3n3cx8-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require')
+    # Vercel: Use in-memory SQLite (no file system writes, no psycopg2 needed)
+    DATABASE_URL = 'sqlite:///:memory:'
 else:
-    # Local development: Use SQLite to avoid psycopg2 build issues
+    # Local development: Use SQLite file
     DATABASE_URL = 'sqlite:///./voters.db'
 
 engine = create_engine(

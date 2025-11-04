@@ -37,7 +37,15 @@ setup_logging()
 
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title='Voter Analysis API')
+app = FastAPI(title='ElectraLens API - Voter Management System', version='1.0.0')
+
+# Initialize sample data for Vercel (in-memory database)
+if os.getenv('VERCEL') or os.getenv('VERCEL_ENV'):
+    try:
+        from .init_data import init_sample_data
+        init_sample_data()
+    except Exception as e:
+        logger.warning(f"Could not initialize sample data: {e}")
 
 # Rate limiting setup
 limiter = Limiter(key_func=get_remote_address)
