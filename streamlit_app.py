@@ -5,12 +5,15 @@ import plotly.express as px
 from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor
 import time
+import os
 
 # Load API base URL from secrets or use default
 try:
     API_BASE = st.secrets.get('API_BASE', 'http://localhost:8000')
 except FileNotFoundError:
-    API_BASE = 'http://localhost:8000'
+    # For production deployment, update this URL to your Vercel deployment
+    API_BASE = os.getenv('API_BASE', 'http://localhost:8000')
+    # Example: API_BASE = 'https://your-app.vercel.app/api'
 
 # Configure session timeout and connection pooling
 session = requests.Session()
