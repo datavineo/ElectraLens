@@ -1,15 +1,20 @@
+# Core API dependencies
 fastapi==0.95.2
 uvicorn[standard]==0.22.0
 sqlalchemy==1.4.52
 pydantic==1.10.7
 python-multipart==0.0.6
-pdfplumber==0.7.6
-tabula-py==2.10.0
-pandas==2.1.1
-streamlit==1.28.0
-plotly==5.17.0
-alembic==1.11.1
 python-dotenv==1.0.0
 slowapi==0.1.9
-psycopg2-binary==2.9.7
+
+# Database
+psycopg2-binary==2.9.5
+
+# Optional: For full application (not needed for API-only deploy)
+# pdfplumber==0.7.6
+# tabula-py==2.10.0
+# pandas==2.1.1
+# streamlit==1.28.0
+# plotly==5.17.0
+# alembic==1.11.1
 
