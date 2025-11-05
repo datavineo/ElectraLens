@@ -48,5 +48,13 @@ P2_*.md
 PROJECT_ANALYSIS.md
 QUICK_FIXES.md
 COMPLETE_PROJECT_ANALYSIS.md
+
+# Environment and secrets
+.env
+.env.*
+.python-version
+
+# Streamlit secrets (ensure the real secrets file is never committed)
+.streamlit/secrets.toml
 EXECUTIVE_SUMMARY.md
 .env
