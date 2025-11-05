@@ -79,7 +79,7 @@ Once deployed, your API will be available at:
 
 2. Update `.env` with your PostgreSQL database URL:
    ```
-   DATABASE_URL=postgresql://neondb_owner:npg_aTq54cvMEkiz@ep-orange-sea-ad3n3cx8-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+   DATABASE_URL="postgresql://<DB_USER>:<DB_PASSWORD>@<DB_HOST>:<DB_PORT>/<DB_NAME>?sslmode=require"
    ALLOWED_ORIGINS=http://localhost:8501
    LOG_LEVEL=INFO
    ```
