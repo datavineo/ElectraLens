@@ -2,29 +2,14 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import sys
-
-# Set environment variables for Vercel
-os.environ['VERCEL'] = '1'
-os.environ['VERCEL_ENV'] = 'production'
-
-# Add parent directory to Python path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-
-# Import database components
-from app.database import get_db, Base, engine
-from app import models, schemas, crud
-from sqlalchemy.orm import Session
-from typing import List
 import logging
+import traceback
 
-# Setup simple logging
-logging.basicConfig(level=logging.INFO)
+# Setup logging first
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Create FastAPI app first (before any imports that might fail)
 app = FastAPI(
     title="ElectraLens API - Voter Management System",
     version="1.0.0",
@@ -40,20 +25,48 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create database tables
-try:
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables created successfully")
-except Exception as e:
-    logger.error(f"Error creating database tables: {e}")
+# Try to import and setup everything with detailed error logging
+initialization_error = None
 
-# Initialize sample data
 try:
+    # Set environment variables for Vercel
+    os.environ['VERCEL'] = '1'
+    os.environ['VERCEL_ENV'] = 'production'
+
+    # Add parent directory to Python path
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(current_dir)
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+    
+    logger.info(f"Python path: {sys.path[:3]}")
+    logger.info(f"Current dir: {current_dir}")
+    
+    # Import database components
+    from app.database import get_db, Base, engine
+    from app import models, schemas, crud
+    from sqlalchemy.orm import Session
+    from typing import List
+    
+    logger.info("✓ All imports successful")
+    
+    # Create database tables
+    Base.metadata.create_all(bind=engine)
+    logger.info("✓ Database tables created")
+    
+    # Initialize sample data
     from app.init_data import init_sample_data
     init_sample_data()
-    logger.info("Sample data initialized")
+    logger.info("✓ Sample data initialized")
+    
 except Exception as e:
-    logger.warning(f"Could not initialize sample data: {e}")
+    initialization_error = {
+        "error": str(e),
+        "traceback": traceback.format_exc(),
+        "type": type(e).__name__
+    }
+    logger.error(f"❌ Initialization failed: {e}")
+    logger.error(f"Full traceback:\n{traceback.format_exc()}")
 
 
 # Root endpoint
@@ -64,16 +77,34 @@ async def root():
         "status": "running",
         "version": "1.0.0",
         "docs": "/docs",
-        "environment": "vercel"
+        "environment": "vercel",
+        "initialization_status": "success" if initialization_error is None else "failed"
     }
 
 
 @app.get("/health")
 async def health():
     return {
-        "status": "healthy",
+        "status": "healthy" if initialization_error is None else "degraded",
         "environment": "vercel",
-        "database": "sqlite-memory"
+        "database": "sqlite-memory",
+        "initialization_error": initialization_error
+    }
+
+
+@app.get("/debug")
+async def debug():
+    """Debug endpoint to see what's failing"""
+    return {
+        "python_version": sys.version,
+        "sys_path": sys.path[:5],
+        "environment_vars": {
+            "VERCEL": os.getenv("VERCEL"),
+            "VERCEL_ENV": os.getenv("VERCEL_ENV"),
+        },
+        "initialization_error": initialization_error,
+        "cwd": os.getcwd(),
+        "api_file": __file__
     }
 
 
