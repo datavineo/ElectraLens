@@ -9,50 +9,55 @@ def init_sample_data():
     db = SessionLocal()
     try:
         # Check if data already exists
-        existing_voters = crud.get_voters(db, skip=0, limit=1)
+        existing_voters = crud.list_voters(db, skip=0, limit=1)
         if existing_voters:
             return  # Data already exists
         
-        # Sample voters data
+        # Sample voters data - matches current schema
         sample_voters = [
             {
                 "name": "John Doe",
                 "age": 35,
+                "gender": "Male",
+                "constituency": "North District",
+                "booth_no": "B001",
                 "address": "123 Main St, New York, NY",
-                "phone": "555-0123",
-                "email": "john.doe@email.com",
                 "vote": True
             },
             {
                 "name": "Jane Smith", 
                 "age": 28,
+                "gender": "Female",
+                "constituency": "South District",
+                "booth_no": "B002",
                 "address": "456 Oak Ave, Los Angeles, CA",
-                "phone": "555-0456",
-                "email": "jane.smith@email.com",
                 "vote": False
             },
             {
                 "name": "Mike Johnson",
                 "age": 42,
-                "address": "789 Pine Rd, Chicago, IL", 
-                "phone": "555-0789",
-                "email": "mike.johnson@email.com",
+                "gender": "Male",
+                "constituency": "East District",
+                "booth_no": "B003",
+                "address": "789 Pine Rd, Chicago, IL",
                 "vote": True
             },
             {
                 "name": "Sarah Wilson",
                 "age": 31,
+                "gender": "Female",
+                "constituency": "West District",
+                "booth_no": "B004",
                 "address": "321 Elm St, Houston, TX",
-                "phone": "555-0321", 
-                "email": "sarah.wilson@email.com",
                 "vote": False
             },
             {
                 "name": "David Brown",
                 "age": 29,
+                "gender": "Male",
+                "constituency": "Central District",
+                "booth_no": "B005",
                 "address": "654 Maple Dr, Phoenix, AZ",
-                "phone": "555-0654",
-                "email": "david.brown@email.com", 
                 "vote": True
             }
         ]

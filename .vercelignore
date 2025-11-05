@@ -1,0 +1,16 @@
+*.db
+logs/
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+*.log
+extract/
+streamlit_app.py
+generate_sample_pdf.py
+run_api.py
+requirements-local.txt
+DEPLOYMENT.md
+README.md
+sample_voters.pdf
