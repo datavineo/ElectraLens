@@ -1,8 +1,31 @@
-fastapi==0.95.2
-uvicorn[standard]==0.22.0
-sqlalchemy==1.4.52
-pydantic==1.10.7
+# ElectraLens - Complete Requirements
+# Backend API + Frontend Dashboard
+
+# ============= Backend Core =============
+fastapi==0.121.0
+uvicorn[standard]==0.38.0
+sqlalchemy==2.0.44
+pydantic==2.12.3
 python-multipart==0.0.6
 python-dotenv==1.0.0
+passlib[bcrypt]==1.7.4
+starlette==0.28.1
+
+# ============= Rate Limiting =============
 slowapi==0.1.9
 
+# ============= Streamlit Frontend =============
+streamlit==1.29.0
+requests==2.31.0
+pandas==2.2.2
+plotly==5.20.0
+
+# ============= Database Drivers =============
+# PostgreSQL support (for production)
+psycopg2-binary==2.9.9
+
+# ============= PDF Processing (Optional) =============
+# Uncomment if using PDF upload feature
+# pdfplumber==0.10.3
+# tabula-py==2.8.2
+# camelot-py==0.11.0

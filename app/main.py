@@ -12,20 +12,21 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+from typing import Dict, Any, TYPE_CHECKING
 
 # Conditional import for extractor (only for non-Vercel environments)
 if not os.getenv('VERCEL'):
     try:
-        from extract.extractor import process_uploaded_pdf, load_csv_into_db
+        from extract.extractor import process_uploaded_pdf, load_csv_into_db  # type: ignore[assignment]
     except ImportError:
-        def process_uploaded_pdf(*args, **kwargs):
+        def process_uploaded_pdf(*args: Any, **kwargs: Any) -> Dict[str, str]:
             return {"error": "PDF processing not available"}
-        def load_csv_into_db(*args, **kwargs):
+        def load_csv_into_db(*args: Any, **kwargs: Any) -> Dict[str, str]:  # type: ignore[misc]
             return {"error": "CSV processing not available"}
 else:
-    def process_uploaded_pdf(*args, **kwargs):
+    def process_uploaded_pdf(*args: Any, **kwargs: Any) -> Dict[str, str]:
         return {"error": "PDF processing not available in serverless environment"}
-    def load_csv_into_db(*args, **kwargs):
+    def load_csv_into_db(*args: Any, **kwargs: Any) -> Dict[str, str]:  # type: ignore[misc]
         return {"error": "CSV processing not available in serverless environment"}
 
 # Load environment variables
@@ -55,7 +56,8 @@ app.state.limiter = limiter
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     """Custom rate limit exceeded handler."""
-    logger.warning(f'Rate limit exceeded: {request.client.host}')
+    client_host = request.client.host if request.client else 'unknown'
+    logger.warning(f'Rate limit exceeded: {client_host}')
     return JSONResponse(
         status_code=429,
         content={'detail': 'Rate limit exceeded. Maximum 100 requests per minute.'},
@@ -81,7 +83,8 @@ async def log_requests(request: Request, call_next):
     start_time = time.time()
     
     # Log incoming request
-    logger.info(f'{request.method} {request.url.path} - Client: {request.client.host}')
+    client_host = request.client.host if request.client else 'unknown'
+    logger.info(f'{request.method} {request.url.path} - Client: {client_host}')
     
     try:
         response = await call_next(request)
@@ -99,6 +102,56 @@ async def log_requests(request: Request, call_next):
             exc_info=True
         )
         raise
+
+
+# Root and utility endpoints
+@app.get('/')
+async def root():
+    """Root endpoint - API information."""
+    return {
+        'message': 'ElectraLens API - Voter Management System',
+        'version': '1.0.0',
+        'status': 'running',
+        'docs': '/docs',
+        'redoc': '/redoc',
+        'endpoints': {
+            'voters': '/voters',
+            'health': '/health',
+            'status': '/status'
+        }
+    }
+
+
+@app.get('/health')
+async def health():
+    """Health check endpoint."""
+    return {
+        'status': 'healthy',
+        'service': 'ElectraLens API',
+        'version': '1.0.0'
+    }
+
+
+@app.get('/status')
+async def status(db: Session = Depends(get_db)):
+    """Status endpoint with database check."""
+    try:
+        # Quick DB check
+        voter_count = crud.count_voters(db)
+        return {
+            'status': 'operational',
+            'database': 'connected',
+            'voter_count': voter_count,
+            'environment': 'vercel' if os.getenv('VERCEL') else 'local'
+        }
+    except Exception as e:
+        logger.error(f'Status check failed: {e}')
+        return {
+            'status': 'degraded',
+            'database': 'error',
+            'error': str(e),
+            'environment': 'vercel' if os.getenv('VERCEL') else 'local'
+        }
 
 
 @app.post('/voters', response_model=schemas.VoterOut)
@@ -241,3 +294,115 @@ def upload_pdf(request: Request, file: UploadFile = File(...), db: Session = Dep
     except Exception as e:
         logger.error(f'PDF processing failed: {str(e)}', exc_info=True)
         raise HTTPException(status_code=400, detail=f'PDF processing failed: {str(e)}')
+
+
+# ============= AUTHENTICATION ENDPOINTS =============
+
+@app.post('/auth/login')
+@limiter.limit('10/minute')
+def login(request: Request, username: str, password: str, db: Session = Depends(get_db)):
+    """Authenticate user and return user details."""
+    logger.info(f'Login attempt for username: {username}')
+    
+    user = crud.authenticate_user(db, username, password)
+    if not user:
+        logger.warning(f'Failed login attempt for username: {username}')
+        raise HTTPException(status_code=401, detail='Invalid username or password')
+    
+    logger.info(f'Successful login: user_id={user.id}, username={username}, role={user.role}')
+    
+    return {
+        'id': user.id,
+        'username': user.username,
+        'full_name': user.full_name,
+        'role': user.role,
+        'last_login': user.last_login
+    }
+
+
+@app.post('/auth/users')
+@limiter.limit('5/minute')
+def create_new_user(
+    request: Request,
+    username: str,
+    password: str,
+    full_name: str = "",
+    role: str = "viewer",
+    db: Session = Depends(get_db)
+):
+    """Create a new user (admin only in production)."""
+    # Check if username already exists
+    existing_user = crud.get_user_by_username(db, username)
+    if existing_user:
+        raise HTTPException(status_code=400, detail='Username already exists')
+    
+    # Validate role
+    if role not in ['admin', 'viewer']:
+        raise HTTPException(status_code=400, detail='Role must be either admin or viewer')
+    
+    user = crud.create_user(db, username, password, full_name, role)
+    logger.info(f'New user created: username={username}, role={role}')
+    
+    return {
+        'id': user.id,
+        'username': user.username,
+        'full_name': user.full_name,
+        'role': user.role,
+        'created_at': user.created_at
+    }
+
+
+@app.get('/auth/users')
+@limiter.limit('30/minute')
+def get_all_users(request: Request, db: Session = Depends(get_db)):
+    """Get list of all users."""
+    users = crud.list_users(db)
+    return [
+        {
+            'id': u.id,
+            'username': u.username,
+            'full_name': u.full_name,
+            'role': u.role,
+            'is_active': u.is_active,
+            'created_at': u.created_at,
+            'last_login': u.last_login
+        }
+        for u in users
+    ]
+
+
+@app.put('/auth/users/{user_id}')
+@limiter.limit('20/minute')
+def update_user_details(
+    request: Request,
+    user_id: int,
+    full_name: str | None = None,
+    role: str | None = None,
+    is_active: bool | None = None,
+    db: Session = Depends(get_db)
+):
+    """Update user details."""
+    user = crud.update_user(db, user_id, full_name, role, is_active)
+    if not user:
+        raise HTTPException(status_code=404, detail='User not found')
+    
+    logger.info(f'User updated: user_id={user_id}')
+    return {
+        'id': user.id,
+        'username': user.username,
+        'full_name': user.full_name,
+        'role': user.role,
+        'is_active': user.is_active
+    }
+
+
+@app.delete('/auth/users/{user_id}')
+@limiter.limit('10/minute')
+def delete_user_account(request: Request, user_id: int, db: Session = Depends(get_db)):
+    """Delete a user account."""
+    success = crud.delete_user(db, user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail='User not found')
+    
+    logger.info(f'User deleted: user_id={user_id}')
+    return {'deleted': True}

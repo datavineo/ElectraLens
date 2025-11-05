@@ -1,9 +1,16 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from typing import TYPE_CHECKING, List
 import os
 import sys
 import logging
 import traceback
+
+# Type checking imports - these are always available for static analysis
+if TYPE_CHECKING:
+    from app import schemas, crud
+    from app.database import get_db
+    from sqlalchemy.orm import Session
 
 # Setup logging first
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -42,11 +49,10 @@ try:
     logger.info(f"Python path: {sys.path[:3]}")
     logger.info(f"Current dir: {current_dir}")
     
-    # Import database components
-    from app.database import get_db, Base, engine
-    from app import models, schemas, crud
-    from sqlalchemy.orm import Session
-    from typing import List
+    # Import database components at runtime (also imported above for type checking)
+    from app.database import get_db, Base, engine  # type: ignore[misc]
+    from app import models, schemas, crud  # type: ignore[misc]
+    from sqlalchemy.orm import Session  # type: ignore[misc]
     
     logger.info("✓ All imports successful")
     

@@ -1,7 +1,12 @@
 from sqlalchemy.orm import Session
 from . import models, schemas
-from typing import List, Dict
+from typing import List, Dict, Optional
 from sqlalchemy import func
+from passlib.context import CryptContext
+from datetime import datetime
+
+# Password hashing context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def create_voter(db: Session, voter: schemas.VoterCreate):
@@ -39,6 +44,11 @@ def delete_voter(db: Session, voter_id: int):
 
 def list_voters(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Voter).offset(skip).limit(limit).all()
+
+
+def count_voters(db: Session) -> int:
+    """Count total number of voters in the database."""
+    return db.query(models.Voter).count()
 
 
 def summary_by_constituency(db: Session) -> List[Dict]:
@@ -111,3 +121,103 @@ def filter_by_age_range(db: Session, min_age: int, max_age: int, limit: int = 10
         models.Voter.age >= min_age,
         models.Voter.age <= max_age
     ).limit(limit).all()
+
+
+# ============= USER AUTHENTICATION FUNCTIONS =============
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a plain password against a hashed password."""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    """Hash a password for storage."""
+    return pwd_context.hash(password)
+
+
+def create_user(db: Session, username: str, password: str, full_name: str = "", role: str = "viewer"):
+    """Create a new user with hashed password."""
+    hashed_password = get_password_hash(password)
+    db_user = models.User(
+        username=username,
+        password_hash=hashed_password,
+        full_name=full_name,
+        role=role,
+        is_active=True
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+def get_user_by_username(db: Session, username: str) -> Optional[models.User]:
+    """Get user by username."""
+    return db.query(models.User).filter(models.User.username == username).first()
+
+
+def get_user_by_id(db: Session, user_id: int) -> Optional[models.User]:
+    """Get user by ID."""
+    return db.query(models.User).filter(models.User.id == user_id).first()
+
+
+def authenticate_user(db: Session, username: str, password: str) -> Optional[models.User]:
+    """Authenticate user with username and password."""
+    user = get_user_by_username(db, username)
+    if not user:
+        return None
+    if not verify_password(password, user.password_hash):  # type: ignore
+        return None
+    if not user.is_active:  # type: ignore
+        return None
+    
+    # Update last login time
+    user.last_login = datetime.utcnow()  # type: ignore
+    db.commit()
+    
+    return user
+
+
+def list_users(db: Session, skip: int = 0, limit: int = 100):
+    """List all users."""
+    return db.query(models.User).offset(skip).limit(limit).all()
+
+
+def update_user(db: Session, user_id: int, full_name: Optional[str] = None, role: Optional[str] = None, is_active: Optional[bool] = None):
+    """Update user details."""
+    user = get_user_by_id(db, user_id)
+    if not user:
+        return None
+    
+    if full_name is not None:
+        user.full_name = full_name  # type: ignore
+    if role is not None:
+        user.role = role  # type: ignore
+    if is_active is not None:
+        user.is_active = is_active  # type: ignore
+    
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def change_password(db: Session, user_id: int, new_password: str):
+    """Change user password."""
+    user = get_user_by_id(db, user_id)
+    if not user:
+        return None
+    
+    user.password_hash = get_password_hash(new_password)  # type: ignore
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def delete_user(db: Session, user_id: int) -> bool:
+    """Delete a user."""
+    user = get_user_by_id(db, user_id)
+    if not user:
+        return False
+    db.delete(user)
+    db.commit()
+    return True
