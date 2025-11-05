@@ -1,15 +1,27 @@
 {
   "version": 2,
+  "name": "electralens-fullstack",
   "builds": [
     {
       "src": "api/index.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb"
+      }
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/api/(.*)",
       "dest": "/api/index.py"
+    },
+    {
+      "src": "/",
+      "dest": "/web/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/web/$1"
     }
   ],
   "env": {
@@ -18,7 +30,7 @@
   },
   "functions": {
     "api/index.py": {
-      "maxDuration": 30
+      "maxDuration": 60
     }
   }
 }

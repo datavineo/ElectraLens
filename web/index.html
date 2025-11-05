@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ElectraLens - Voter Analysis Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="card p-6 mb-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="text-4xl">🗳️</div>
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-800">ElectraLens</h1>
+                        <p class="text-gray-600">Voter Analysis Dashboard</p>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <button onclick="refreshData()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        <span id="refresh-btn">🔄 Refresh</span>
+                    </button>
+                    <a href="/api/docs" target="_blank" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        📚 API Docs
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Section -->
+        <div id="login-section" class="card p-6 mb-8">
+            <h2 class="text-2xl font-bold mb-4">🔐 Admin Login</h2>
+            <div class="flex space-x-4">
+                <input type="text" id="username" placeholder="Username" class="border rounded-lg px-4 py-2 flex-1">
+                <input type="password" id="password" placeholder="Password" class="border rounded-lg px-4 py-2 flex-1">
+                <button onclick="login()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors">
+                    Login
+                </button>
+            </div>
+            <div id="login-status" class="mt-2"></div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="card p-6 text-center">
+                <div class="text-3xl font-bold text-blue-600" id="total-voters">-</div>
+                <div class="text-gray-600">Total Voters</div>
+            </div>
+            <div class="card p-6 text-center">
+                <div class="text-3xl font-bold text-green-600" id="male-voters">-</div>
+                <div class="text-gray-600">Male Voters</div>
+            </div>
+            <div class="card p-6 text-center">
+                <div class="text-3xl font-bold text-pink-600" id="female-voters">-</div>
+                <div class="text-gray-600">Female Voters</div>
+            </div>
+            <div class="card p-6 text-center">
+                <div class="text-3xl font-bold text-purple-600" id="youth-voters">-</div>
+                <div class="text-gray-600">Youth (18-30)</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="card p-6">
+                <h3 class="text-xl font-bold mb-4">👥 Gender Distribution</h3>
+                <div id="gender-chart"></div>
+            </div>
+            <div class="card p-6">
+                <h3 class="text-xl font-bold mb-4">📅 Age Distribution</h3>
+                <div id="age-chart"></div>
+            </div>
+        </div>
+
+        <!-- Constituency Chart -->
+        <div class="card p-6 mb-8">
+            <h3 class="text-xl font-bold mb-4">📍 Voters by Constituency</h3>
+            <div id="constituency-chart"></div>
+        </div>
+
+        <!-- Voters Table -->
+        <div class="card p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">👥 Voters List</h3>
+                <div class="flex space-x-2">
+                    <input type="text" id="search-input" placeholder="Search voters..." class="border rounded-lg px-4 py-2">
+                    <button onclick="searchVoters()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                        🔍 Search
+                    </button>
+                </div>
+            </div>
+            <div id="voters-table" class="overflow-x-auto">
+                <div class="text-center py-8 text-gray-500">Loading voters...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const API_BASE = window.location.origin;
+        let authToken = null;
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboard();
+        });
+
+        // Login functionality
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const statusDiv = document.getElementById('login-status');
+
+            if (!username || !password) {
+                statusDiv.innerHTML = '<span class="text-red-500">Please enter username and password</span>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login?username=${username}&password=${password}`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    const userData = await response.json();
+                    authToken = userData.token || 'authenticated';
+                    statusDiv.innerHTML = `<span class="text-green-500">✅ Welcome, ${userData.full_name || username}!</span>`;
+                    document.getElementById('login-section').style.display = 'none';
+                } else {
+                    statusDiv.innerHTML = '<span class="text-red-500">❌ Invalid credentials</span>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '<span class="text-red-500">❌ Connection error</span>';
+            }
+        }
+
+        // Load dashboard data
+        async function loadDashboard() {
+            await Promise.all([
+                loadStats(),
+                loadCharts(),
+                loadVoters()
+            ]);
+        }
+
+        // Load statistics
+        async function loadStats() {
+            try {
+                // Gender ratio
+                const genderResponse = await fetch(`${API_BASE}/api/voters/gender-ratio`);
+                const genderData = await genderResponse.json();
+                
+                document.getElementById('male-voters').textContent = genderData.M || 0;
+                document.getElementById('female-voters').textContent = genderData.F || 0;
+                document.getElementById('total-voters').textContent = (genderData.M || 0) + (genderData.F || 0);
+
+                // Age distribution
+                const ageResponse = await fetch(`${API_BASE}/api/voters/age-distribution`);
+                const ageData = await ageResponse.json();
+                document.getElementById('youth-voters').textContent = ageData['18-30'] || 0;
+
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        // Load charts
+        async function loadCharts() {
+            try {
+                // Gender chart
+                const genderResponse = await fetch(`${API_BASE}/api/voters/gender-ratio`);
+                const genderData = await genderResponse.json();
+                
+                Plotly.newPlot('gender-chart', [{
+                    values: Object.values(genderData),
+                    labels: Object.keys(genderData).map(k => k === 'M' ? 'Male' : 'Female'),
+                    type: 'pie',
+                    hole: 0.4,
+                    marker: {
+                        colors: ['#667eea', '#f093fb']
+                    }
+                }], {
+                    margin: { t: 0, b: 0, l: 0, r: 0 }
+                });
+
+                // Age distribution chart
+                const ageResponse = await fetch(`${API_BASE}/api/voters/age-distribution`);
+                const ageData = await ageResponse.json();
+                
+                Plotly.newPlot('age-chart', [{
+                    x: Object.keys(ageData),
+                    y: Object.values(ageData),
+                    type: 'bar',
+                    marker: {
+                        color: '#764ba2'
+                    }
+                }], {
+                    margin: { t: 0, b: 40, l: 40, r: 0 }
+                });
+
+                // Constituency chart
+                const summaryResponse = await fetch(`${API_BASE}/api/voters/summary`);
+                const summaryData = await summaryResponse.json();
+                
+                Plotly.newPlot('constituency-chart', [{
+                    x: summaryData.map(item => item.constituency),
+                    y: summaryData.map(item => item.count),
+                    type: 'bar',
+                    marker: {
+                        color: '#667eea'
+                    }
+                }], {
+                    margin: { t: 0, b: 80, l: 40, r: 0 }
+                });
+
+            } catch (error) {
+                console.error('Error loading charts:', error);
+            }
+        }
+
+        // Load voters table
+        async function loadVoters() {
+            try {
+                const response = await fetch(`${API_BASE}/api/voters?limit=50`);
+                const voters = await response.json();
+                
+                let tableHTML = `
+                    <table class="min-w-full bg-white">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="py-2 px-4 text-left">ID</th>
+                                <th class="py-2 px-4 text-left">Name</th>
+                                <th class="py-2 px-4 text-left">Age</th>
+                                <th class="py-2 px-4 text-left">Gender</th>
+                                <th class="py-2 px-4 text-left">Constituency</th>
+                                <th class="py-2 px-4 text-left">Booth</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                voters.forEach(voter => {
+                    tableHTML += `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="py-2 px-4">${voter.id}</td>
+                            <td class="py-2 px-4 font-medium">${voter.name}</td>
+                            <td class="py-2 px-4">${voter.age || '-'}</td>
+                            <td class="py-2 px-4">${voter.gender}</td>
+                            <td class="py-2 px-4">${voter.constituency}</td>
+                            <td class="py-2 px-4">${voter.booth_no}</td>
+                        </tr>
+                    `;
+                });
+
+                tableHTML += '</tbody></table>';
+                document.getElementById('voters-table').innerHTML = tableHTML;
+
+            } catch (error) {
+                document.getElementById('voters-table').innerHTML = '<div class="text-center py-8 text-red-500">Error loading voters</div>';
+            }
+        }
+
+        // Search voters
+        async function searchVoters() {
+            const query = document.getElementById('search-input').value;
+            if (!query) {
+                loadVoters();
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/voters/search?q=${encodeURIComponent(query)}&limit=100`);
+                const voters = await response.json();
+                
+                // Update table with search results
+                let tableHTML = `
+                    <table class="min-w-full bg-white">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="py-2 px-4 text-left">ID</th>
+                                <th class="py-2 px-4 text-left">Name</th>
+                                <th class="py-2 px-4 text-left">Age</th>
+                                <th class="py-2 px-4 text-left">Gender</th>
+                                <th class="py-2 px-4 text-left">Constituency</th>
+                                <th class="py-2 px-4 text-left">Booth</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                if (voters.length === 0) {
+                    tableHTML += '<tr><td colspan="6" class="text-center py-8 text-gray-500">No voters found</td></tr>';
+                } else {
+                    voters.forEach(voter => {
+                        tableHTML += `
+                            <tr class="border-b hover:bg-gray-50">
+                                <td class="py-2 px-4">${voter.id}</td>
+                                <td class="py-2 px-4 font-medium">${voter.name}</td>
+                                <td class="py-2 px-4">${voter.age || '-'}</td>
+                                <td class="py-2 px-4">${voter.gender}</td>
+                                <td class="py-2 px-4">${voter.constituency}</td>
+                                <td class="py-2 px-4">${voter.booth_no}</td>
+                            </tr>
+                        `;
+                    });
+                }
+
+                tableHTML += '</tbody></table>';
+                document.getElementById('voters-table').innerHTML = tableHTML;
+
+            } catch (error) {
+                document.getElementById('voters-table').innerHTML = '<div class="text-center py-8 text-red-500">Search error</div>';
+            }
+        }
+
+        // Refresh all data
+        async function refreshData() {
+            const btn = document.getElementById('refresh-btn');
+            btn.innerHTML = '<span class="loading"></span> Loading...';
+            
+            await loadDashboard();
+            
+            btn.innerHTML = '🔄 Refresh';
+        }
+
+        // Enter key support for search
+        document.getElementById('search-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchVoters();
+            }
+        });
+
+        // Enter key support for login
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                login();
+            }
+        });
+    </script>
+</body>
+</html>
