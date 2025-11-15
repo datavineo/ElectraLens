@@ -47,7 +47,7 @@
                     <button onclick="refreshData()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
                         <span id="refresh-btn">🔄 Refresh</span>
                     </button>
-                    <a href="/api/docs" target="_blank" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    <a href="http://localhost:8000/docs" target="_blank" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg transition-colors">
                         📚 API Docs
                     </a>
                 </div>
@@ -124,7 +124,7 @@
 
     <script>
         // API Configuration
-        const API_BASE = window.location.origin;
+        const API_BASE = 'http://localhost:8000';
         let authToken = null;
 
         // Initialize dashboard
@@ -144,7 +144,7 @@
             }
 
             try {
-                const response = await fetch(`${API_BASE}/api/auth/login?username=${username}&password=${password}`, {
+                const response = await fetch(`${API_BASE}/auth/login?username=${username}&password=${password}`, {
                     method: 'POST'
                 });
 
@@ -174,7 +174,7 @@
         async function loadStats() {
             try {
                 // Gender ratio
-                const genderResponse = await fetch(`${API_BASE}/api/voters/gender-ratio`);
+                const genderResponse = await fetch(`${API_BASE}/voters/gender-ratio`);
                 const genderData = await genderResponse.json();
                 
                 document.getElementById('male-voters').textContent = genderData.M || 0;
@@ -182,7 +182,7 @@
                 document.getElementById('total-voters').textContent = (genderData.M || 0) + (genderData.F || 0);
 
                 // Age distribution
-                const ageResponse = await fetch(`${API_BASE}/api/voters/age-distribution`);
+                const ageResponse = await fetch(`${API_BASE}/voters/age-distribution`);
                 const ageData = await ageResponse.json();
                 document.getElementById('youth-voters').textContent = ageData['18-30'] || 0;
 
@@ -195,7 +195,7 @@
         async function loadCharts() {
             try {
                 // Gender chart
-                const genderResponse = await fetch(`${API_BASE}/api/voters/gender-ratio`);
+                const genderResponse = await fetch(`${API_BASE}/voters/gender-ratio`);
                 const genderData = await genderResponse.json();
                 
                 Plotly.newPlot('gender-chart', [{
@@ -211,7 +211,7 @@
                 });
 
                 // Age distribution chart
-                const ageResponse = await fetch(`${API_BASE}/api/voters/age-distribution`);
+                const ageResponse = await fetch(`${API_BASE}/voters/age-distribution`);
                 const ageData = await ageResponse.json();
                 
                 Plotly.newPlot('age-chart', [{
@@ -226,7 +226,7 @@
                 });
 
                 // Constituency chart
-                const summaryResponse = await fetch(`${API_BASE}/api/voters/summary`);
+                const summaryResponse = await fetch(`${API_BASE}/voters/summary`);
                 const summaryData = await summaryResponse.json();
                 
                 Plotly.newPlot('constituency-chart', [{
@@ -248,7 +248,7 @@
         // Load voters table
         async function loadVoters() {
             try {
-                const response = await fetch(`${API_BASE}/api/voters?limit=50`);
+                const response = await fetch(`${API_BASE}/voters?limit=50`);
                 const voters = await response.json();
                 
                 let tableHTML = `
@@ -296,7 +296,7 @@
             }
 
             try {
-                const response = await fetch(`${API_BASE}/api/voters/search?q=${encodeURIComponent(query)}&limit=100`);
+                const response = await fetch(`${API_BASE}/voters/search?q=${encodeURIComponent(query)}&limit=100`);
                 const voters = await response.json();
                 
                 // Update table with search results
