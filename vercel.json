@@ -26,8 +26,10 @@
   ],
   "env": {
     "VERCEL": "1",
-    "VERCEL_ENV": "production",
-    "API_VERSION": "2.0.0"
+    "VERCEL_ENV": "production", 
+    "API_VERSION": "4.0.0",
+    "FORCE_REBUILD": "true",
+    "AUTH_ENABLED": "true"
   },
   "functions": {
     "api/index.py": {

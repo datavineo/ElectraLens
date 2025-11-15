@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app first (before any imports that might fail)
 app = FastAPI(
-    title="ElectraLens API - Voter Management System",
-    version="2.0.0",
-    description="API for managing voter information with authentication"
+    title="ElectraLens API - Complete Authentication System",
+    version="4.0.0",
+    description="API for managing voter information with full authentication suite - GUARANTEED AUTH ENDPOINTS"
 )
 
 # Configure CORS for production
@@ -72,12 +72,21 @@ initialization_error = None
 # Root endpoint
 @app.get("/")
 async def root():
+    # Count authentication endpoints
+    auth_routes = []
+    for route in app.routes:
+        if hasattr(route, 'path') and hasattr(route, 'methods'):
+            if 'login' in route.path or 'auth' in route.path:
+                auth_routes.append(f"{list(route.methods)} {route.path}")
+    
     return {
-        "message": "ElectraLens API - Voter Management System",
+        "message": "ElectraLens API - Complete Authentication System",
         "status": "running",
-        "version": "2.0.0",
+        "version": "4.0.0",
         "docs": "/docs",
         "environment": "vercel",
+        "authentication_endpoints": auth_routes,
+        "auth_endpoints_count": len(auth_routes),
         "initialization_status": "success" if initialization_error is None else "failed"
     }
 
