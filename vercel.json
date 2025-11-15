@@ -31,10 +31,5 @@
     "API_VERSION": "4.0.0",
     "FORCE_REBUILD": "true",
     "AUTH_ENABLED": "true"
-  },
-  "functions": {
-    "api/index.py": {
-      "maxDuration": 60
-    }
   }
 }
