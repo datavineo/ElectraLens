@@ -42,79 +42,31 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
 )
 
-# Try to import and setup everything with detailed error logging
+# Initialize environment variables first
+os.environ['VERCEL'] = '1'
+os.environ['VERCEL_ENV'] = 'production'
+
+# Set production environment variables for Vercel
+if not os.getenv('DATABASE_URL'):
+    os.environ['DATABASE_URL'] = 'postgresql://neondb_owner:npg_aTq54cvMEkiz@ep-orange-sea-ad3n3cx8-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+
+if not os.getenv('JWT_SECRET_KEY'):
+    os.environ['JWT_SECRET_KEY'] = 'ElectraLens-Production-Secret-2024-CHANGE-THIS-IMMEDIATELY'
+
+if not os.getenv('FRONTEND_URL'):
+    os.environ['FRONTEND_URL'] = 'https://datavineo.vercel.app'
+
+if not os.getenv('ENVIRONMENT'):
+    os.environ['ENVIRONMENT'] = 'production'
+
+# Add parent directory to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+# Database initialization will happen after endpoint definitions
 initialization_error = None
-
-try:
-    # Set environment variables for Vercel
-    os.environ['VERCEL'] = '1'
-    os.environ['VERCEL_ENV'] = 'production'
-    
-    # Set production environment variables for Vercel
-    if not os.getenv('DATABASE_URL'):
-        os.environ['DATABASE_URL'] = 'postgresql://neondb_owner:npg_aTq54cvMEkiz@ep-orange-sea-ad3n3cx8-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
-    
-    if not os.getenv('JWT_SECRET_KEY'):
-        os.environ['JWT_SECRET_KEY'] = 'ElectraLens-Production-Secret-2024-CHANGE-THIS-IMMEDIATELY'
-    
-    if not os.getenv('FRONTEND_URL'):
-        os.environ['FRONTEND_URL'] = 'https://datavineo.vercel.app'
-    
-    if not os.getenv('ENVIRONMENT'):
-        os.environ['ENVIRONMENT'] = 'production'
-
-    # Add parent directory to Python path
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.dirname(current_dir)
-    if parent_dir not in sys.path:
-        sys.path.insert(0, parent_dir)
-    
-    logger.info(f"Python path: {sys.path[:3]}")
-    logger.info(f"Current dir: {current_dir}")
-    
-    # Import database components at runtime (also imported above for type checking)
-    from app.database import get_db, Base, engine, SessionLocal  # type: ignore[misc]
-    from app import models, schemas, crud  # type: ignore[misc]
-    from sqlalchemy.orm import Session  # type: ignore[misc]
-    
-    logger.info("✓ All imports successful")
-    
-    # Create database tables
-    Base.metadata.create_all(bind=engine)
-    logger.info("✓ Database tables created")
-    
-    # Initialize sample data
-    from app.init_data import init_sample_data
-    init_sample_data()
-    logger.info("✓ Sample data initialized")
-    
-    # Initialize admin users
-    try:
-        db = SessionLocal()
-        admin_user = crud.get_user_by_username(db, "admin")
-        if not admin_user:
-            admin = crud.create_user(
-                db=db,
-                username="admin", 
-                password="admin123",
-                full_name="System Administrator",
-                role="admin"
-            )
-            logger.info("✓ Default admin user created")
-        else:
-            logger.info("✓ Admin user already exists")
-        db.close()
-    except Exception as admin_error:
-        logger.error(f"❌ Admin initialization failed: {admin_error}")
-    
-except Exception as e:
-    initialization_error = {
-        "error": str(e),
-        "traceback": traceback.format_exc(),
-        "type": type(e).__name__
-    }
-    logger.error(f"❌ Initialization failed: {e}")
-    logger.error(f"Full traceback:\n{traceback.format_exc()}")
 
 
 # Root endpoint
@@ -123,7 +75,7 @@ async def root():
     return {
         "message": "ElectraLens API - Voter Management System",
         "status": "running",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "docs": "/docs",
         "environment": "vercel",
         "initialization_status": "success" if initialization_error is None else "failed"
@@ -415,3 +367,82 @@ async def status():
         "cors_enabled": True,
         "rate_limiting": os.getenv("RATE_LIMITING_ENABLED", "true") == "true"
     }
+
+
+# Fallback database dependency (in case initialization fails)
+def get_db_fallback():
+    """Fallback database session generator."""
+    try:
+        from app.database import SessionLocal
+        db = SessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Database session error: {e}")
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
+# Try to import get_db, use fallback if not available
+try:
+    from app.database import get_db
+except ImportError:
+    get_db = get_db_fallback
+
+# Database initialization (moved to end to not interfere with endpoint registration)
+def initialize_database():
+    """Initialize database components after all endpoints are defined."""
+    global initialization_error
+    try:
+        logger.info(f"Python path: {sys.path[:3]}")
+        logger.info(f"Current dir: {current_dir}")
+        
+        # Import database components at runtime
+        from app.database import get_db, Base, engine, SessionLocal  # type: ignore[misc]
+        from app import models, schemas, crud  # type: ignore[misc]
+        from sqlalchemy.orm import Session  # type: ignore[misc]
+        
+        logger.info("✓ All imports successful")
+        
+        # Create database tables
+        Base.metadata.create_all(bind=engine)
+        logger.info("✓ Database tables created")
+        
+        # Initialize sample data
+        from app.init_data import init_sample_data
+        init_sample_data()
+        logger.info("✓ Sample data initialized")
+        
+        # Initialize admin users
+        try:
+            db = SessionLocal()
+            admin_user = crud.get_user_by_username(db, "admin")
+            if not admin_user:
+                admin = crud.create_user(
+                    db=db,
+                    username="admin", 
+                    password="admin123",
+                    full_name="System Administrator",
+                    role="admin"
+                )
+                logger.info("✓ Default admin user created")
+            else:
+                logger.info("✓ Admin user already exists")
+            db.close()
+        except Exception as admin_error:
+            logger.error(f"❌ Admin initialization failed: {admin_error}")
+        
+    except Exception as e:
+        initialization_error = {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "type": type(e).__name__
+        }
+        logger.error(f"❌ Initialization failed: {e}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
+# Initialize database on module load (but after endpoint definitions)
+try:
+    initialize_database()
+except Exception as e:
+    logger.warning(f"Database initialization deferred due to: {e}")
