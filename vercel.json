@@ -3,7 +3,7 @@
   "name": "electralens-fullstack",
   "builds": [
     {
-      "src": "api/main.py",
+      "src": "api/index.py",
       "use": "@vercel/python",
       "config": {
         "maxLambdaSize": "15mb",
@@ -14,7 +14,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/main.py"
+      "dest": "/api/index.py"
     },
     {
       "src": "/",
@@ -33,7 +33,7 @@
     "AUTH_ENABLED": "true"
   },
   "functions": {
-    "api/main.py": {
+    "api/index.py": {
       "maxDuration": 60
     }
   }
