@@ -11,8 +11,9 @@ import os
 try:
     API_BASE = st.secrets.get('API_BASE', 'https://electra-lens.vercel.app')
 except FileNotFoundError:
-    # Production deployment URL - deployed backend on Vercel
+    # For production deployment, use environment variable or default to working Vercel URL
     API_BASE = os.getenv('API_BASE', 'https://electra-lens.vercel.app')
+    # ✅ Verified working API URL: https://electra-lens.vercel.app
 
 # Configure session timeout and connection pooling
 session = requests.Session()
