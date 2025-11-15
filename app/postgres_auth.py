@@ -49,10 +49,23 @@ def authenticate_postgres_user(db: Session, username: str, password: str):
     if not user:
         return None
     
-    if not verify_simple_password(password, user.password_hash):
+    # Get password hash safely - SQLAlchemy will handle the conversion
+    try:
+        user_password_hash = getattr(user, 'password_hash', '')
+        if not user_password_hash:
+            return None
+            
+        if not verify_simple_password(password, user_password_hash):
+            return None
+    except Exception:
         return None
     
-    if not user.is_active:
+    # Check if user is active safely
+    try:
+        user_is_active = getattr(user, 'is_active', False)
+        if not user_is_active:
+            return None
+    except Exception:
         return None
     
     return user
