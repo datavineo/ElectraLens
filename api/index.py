@@ -213,6 +213,30 @@ async def gender_ratio_endpoint(db: Session = Depends(get_db)):
     return crud.gender_ratio(db)
 
 
+@app.post('/auth/login')
+async def login(username: str, password: str, db: Session = Depends(get_db)):
+    """Authenticate user and return user data."""
+    logger.info(f'Login attempt for username: {username}')
+    
+    user = crud.authenticate_user(db, username, password)
+    if not user:
+        logger.warning(f'Failed login attempt for username: {username}')
+        raise HTTPException(status_code=401, detail='Invalid username or password')
+        
+    logger.info(f'Successful login: user_id={user.id}, username={username}, role={user.role}')
+    
+    # Return user data (excluding password)
+    return {
+        'id': user.id,
+        'username': user.username,
+        'full_name': user.full_name,
+        'role': user.role,
+        'is_active': user.is_active,
+        'created_at': user.created_at,
+        'last_login': user.last_login
+    }
+
+
 @app.get("/status")
 async def status():
     """Get API status."""
