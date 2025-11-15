@@ -7,12 +7,16 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Use SQLite for Vercel deployment (reliable and fast)
-if os.getenv('VERCEL') or os.getenv('VERCEL_ENV'):
-    DATABASE_URL = 'sqlite:///:memory:'
-else:
-    # For local development, check for DATABASE_URL or use SQLite
-    DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./voters.db')
+# Force SQLite for all environments (most reliable for demo)
+DATABASE_URL = 'sqlite:///:memory:'
+
+# Log the database URL being used
+print(f"🗄️ Database URL: {DATABASE_URL}")
+
+# Override any environment DATABASE_URL that might cause issues
+if 'DATABASE_URL' in os.environ:
+    del os.environ['DATABASE_URL']
+    print("🔧 Removed problematic DATABASE_URL from environment")
 
 engine = create_engine(
     DATABASE_URL,
