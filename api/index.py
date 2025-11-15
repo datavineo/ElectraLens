@@ -50,7 +50,7 @@ try:
     logger.info(f"Current dir: {current_dir}")
     
     # Import database components at runtime (also imported above for type checking)
-    from app.database import get_db, Base, engine  # type: ignore[misc]
+    from app.database import get_db, Base, engine, SessionLocal  # type: ignore[misc]
     from app import models, schemas, crud  # type: ignore[misc]
     from sqlalchemy.orm import Session  # type: ignore[misc]
     
@@ -64,6 +64,25 @@ try:
     from app.init_data import init_sample_data
     init_sample_data()
     logger.info("✓ Sample data initialized")
+    
+    # Initialize admin users
+    try:
+        db = SessionLocal()
+        admin_user = crud.get_user_by_username(db, "admin")
+        if not admin_user:
+            admin = crud.create_user(
+                db=db,
+                username="admin", 
+                password="admin123",
+                full_name="System Administrator",
+                role="admin"
+            )
+            logger.info("✓ Default admin user created")
+        else:
+            logger.info("✓ Admin user already exists")
+        db.close()
+    except Exception as admin_error:
+        logger.error(f"❌ Admin initialization failed: {admin_error}")
     
 except Exception as e:
     initialization_error = {
