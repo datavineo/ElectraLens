@@ -125,7 +125,7 @@ class AuthUtils:
 
 # Role-based access control
 class RoleChecker:
-    def __init__(self, allowed_roles: list = None):
+    def __init__(self, allowed_roles: Optional[list[str]] = None):
         self.allowed_roles = allowed_roles or ["viewer", "admin"]
     
     def __call__(self, current_user: Dict[str, Any] = Depends(AuthUtils.get_current_user_from_token)) -> Dict[str, Any]:
