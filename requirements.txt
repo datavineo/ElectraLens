@@ -23,5 +23,6 @@ psycopg2-binary==2.9.11
 # Common Dependencies
 python-dotenv==1.0.0
 
-# PDF Processing (optional - may cause issues in serverless)
-# pdfplumber>=0.7.0
+# PDF Processing
+pdfplumber>=0.7.0
+gunicorn==21.2.0
