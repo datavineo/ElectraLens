@@ -7,15 +7,12 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Prefer DATABASE_URL from environment (for production PostgreSQL)
-DATABASE_URL = os.getenv('DATABASE_URL')
-
-if not DATABASE_URL:
-    # Fallback: Use in-memory SQLite on Vercel, file-based locally
-    if os.getenv('VERCEL') or os.getenv('VERCEL_ENV'):
-        DATABASE_URL = 'sqlite:///:memory:'
-    else:
-        DATABASE_URL = 'sqlite:///./voters.db'
+# Use SQLite for Vercel deployment (reliable and fast)
+if os.getenv('VERCEL') or os.getenv('VERCEL_ENV'):
+    DATABASE_URL = 'sqlite:///:memory:'
+else:
+    # For local development, check for DATABASE_URL or use SQLite
+    DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./voters.db')
 
 engine = create_engine(
     DATABASE_URL,
