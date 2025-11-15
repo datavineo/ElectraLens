@@ -1075,7 +1075,14 @@ if tab == '📊 Summary':
     
     # Key metrics cards
     st.markdown("### 📊 Key Metrics")
-    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+    metric_col1, metric_col2, metric_col3, metric_col4, metric_col5 = st.columns(5)
+    
+    # Get voting statistics
+    try:
+        voting_stats_resp = session.get(f'{API_BASE}/voters/stats/voting', timeout=5)
+        voting_stats = voting_stats_resp.json() if voting_stats_resp.status_code == 200 else {}
+    except:
+        voting_stats = {}
     
     with metric_col1:
         st.metric(label="👥 Total Voters", value=f"{total_voters:,}")
@@ -1087,7 +1094,12 @@ if tab == '📊 Summary':
         st.metric(label="👩 Female Voters", value=f"{female_count:,}")
     
     with metric_col4:
-        st.metric(label="🎓 Youth (18-30)", value=f"{youth_count:,}")
+        voted_count = voting_stats.get('voted', 0)
+        st.metric(label="✅ Voted", value=f"{voted_count:,}")
+    
+    with metric_col5:
+        turnout = voting_stats.get('turnout_percentage', 0)
+        st.metric(label="📊 Turnout", value=f"{turnout:.1f}%")
     
     st.markdown("---")
     
@@ -1348,13 +1360,35 @@ elif tab == '👥 Voters':
             # Editable vote column - Use session state to track changes
             with col_vote:
                 vote_key = f"vote_{row['id']}"
+                original_vote_key = f"original_vote_{row['id']}"
+                
+                # Initialize session state for vote tracking
                 if vote_key not in st.session_state:
                     vote_value = row.get('vote', False)
                     if isinstance(vote_value, str):
                         vote_value = vote_value.lower() in ['true', '1', 'yes']
                     st.session_state[vote_key] = bool(vote_value)
+                    st.session_state[original_vote_key] = bool(vote_value)
                 
                 new_vote = st.checkbox('✓', value=st.session_state[vote_key], key=vote_key, label_visibility='collapsed')
+                
+                # If vote status changed, update via API
+                if new_vote != st.session_state[original_vote_key]:
+                    try:
+                        response = session.post(f'{API_BASE}/voters/{row["id"]}/toggle-vote', timeout=5)
+                        if response.status_code == 200:
+                            st.session_state[original_vote_key] = new_vote
+                            st.success(f"Vote status updated for {row.get('name', 'voter')}!")
+                            time.sleep(0.5)  # Brief pause for user feedback
+                            st.rerun()  # Refresh to show updated counts
+                        else:
+                            st.error(f"Failed to update vote status: {response.text}")
+                            # Reset checkbox to original state
+                            st.session_state[vote_key] = st.session_state[original_vote_key]
+                    except Exception as e:
+                        st.error(f"Error updating vote status: {str(e)}")
+                        # Reset checkbox to original state
+                        st.session_state[vote_key] = st.session_state[original_vote_key]
     else:
         st.info('No voters found')
 

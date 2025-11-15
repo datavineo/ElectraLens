@@ -492,3 +492,33 @@ def delete_user_account(request: Request, user_id: int, db: Session = Depends(ge
     
     logger.info(f'User deleted: user_id={user_id}')
     return {'deleted': True}
+
+
+# ============= VOTE TOGGLE ENDPOINT =============
+@app.post('/voters/{voter_id}/toggle-vote')
+@limiter.limit('50/minute')
+def toggle_vote_status(request: Request, voter_id: int, db: Session = Depends(get_db)):
+    """Toggle voting status for a voter."""
+    voter = crud.get_voter(db, voter_id=voter_id)
+    if not voter:
+        raise HTTPException(status_code=404, detail='Voter not found')
+    
+    # Toggle voting status
+    voter.vote = not voter.vote
+    db.commit()
+    db.refresh(voter)
+    
+    logger.info(f'Vote status toggled for voter_id={voter_id}, new status={voter.vote}')
+    return {
+        'message': 'Vote status updated successfully',
+        'voter_id': voter_id,
+        'voted': voter.vote
+    }
+
+
+# ============= VOTING STATISTICS ENDPOINT =============
+@app.get('/voters/stats/voting')
+@limiter.limit('100/minute')
+def get_voting_statistics(request: Request, db: Session = Depends(get_db)):
+    """Get voting statistics and turnout."""
+    return crud.get_voting_stats(db)

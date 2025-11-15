@@ -48,6 +48,18 @@ def count_voters(db: Session) -> int:
     return db.query(models.Voter).count()
 
 
+def get_voting_stats(db: Session) -> Dict:
+    """Get voting statistics."""
+    total = db.query(models.Voter).count()
+    voted = db.query(models.Voter).filter(models.Voter.vote == True).count()
+    return {
+        'total_voters': total,
+        'voted': voted,
+        'not_voted': total - voted,
+        'turnout_percentage': round((voted / total * 100), 2) if total > 0 else 0
+    }
+
+
 def summary_by_constituency(db: Session) -> List[Dict]:
     q = db.query(models.Voter.constituency, func.count(models.Voter.id)).group_by(models.Voter.constituency).all()
     return [{'constituency': c or 'UNKNOWN', 'count': cnt} for c, cnt in q]
