@@ -7,9 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 import os
 
-# Load API base URL from secrets or use default
+# Load API base URL from secrets or use deployed backend
 try:
-    API_BASE = st.secrets.get('API_BASE', 'http://localhost:8000')
+    API_BASE = st.secrets.get('API_BASE', 'https://electra-lens.vercel.app')
 except FileNotFoundError:
     # For production deployment, use environment variable or default to working Vercel URL
     API_BASE = os.getenv('API_BASE', 'https://electra-lens.vercel.app')
