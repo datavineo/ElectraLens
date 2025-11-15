@@ -22,32 +22,34 @@ def init_admin():
             print(f"   Active: {admin_user.is_active}")
         else:
             # Create default admin user
+            default_password = "CHANGE_ME_IMMEDIATELY"
             admin = crud.create_user(
                 db=db,
                 username="admin",
-                password="admin123",
+                password=default_password,
                 full_name="System Administrator",
                 role="admin"
             )
             print("✅ Default admin user created successfully!")
             print(f"   Username: {admin.username}")
-            print(f"   Password: admin123")
+            print(f"   Password: {default_password}")
             print(f"   Role: {admin.role}")
-            print("\n⚠️  IMPORTANT: Please change the default password after first login!")
+            print("\n⚠️  CRITICAL: Change the default password immediately after first login!")
         
         # Create a demo viewer user
         viewer_user = crud.get_user_by_username(db, "viewer")
         if not viewer_user:
+            demo_password = "CHANGE_ME_TOO"
             viewer = crud.create_user(
                 db=db,
                 username="viewer",
-                password="viewer123",
+                password=demo_password,
                 full_name="Demo Viewer",
                 role="viewer"
             )
             print("\n✅ Demo viewer user created successfully!")
             print(f"   Username: {viewer.username}")
-            print(f"   Password: viewer123")
+            print(f"   Password: {demo_password}")
             print(f"   Role: {viewer.role}")
         
     except Exception as e:
