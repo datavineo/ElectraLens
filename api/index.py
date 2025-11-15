@@ -237,6 +237,12 @@ async def login(username: str, password: str, db: Session = Depends(get_db)):
     }
 
 
+@app.get("/auth/test")
+async def auth_test():
+    """Test authentication endpoint availability."""
+    return {"message": "Auth endpoint available", "status": "ready"}
+
+
 @app.get("/status")
 async def status():
     """Get API status."""
