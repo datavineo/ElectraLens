@@ -133,7 +133,16 @@
     </div>
 
     <script>
+        // Production API configuration
         const API_BASE = 'https://electra-lens.vercel.app';
+        
+        // Production configuration
+        const CONFIG = {
+            API_BASE: API_BASE,
+            FRONTEND_URL: 'https://datavineo.vercel.app',
+            ENVIRONMENT: 'production',
+            VERSION: '2.0.0'
+        };
         let currentUser = null;
 
         // DOM elements

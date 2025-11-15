@@ -4,6 +4,9 @@ from sqlalchemy.orm import Session
 from . import models, schemas, crud
 from .database import engine, get_db
 from .logging_config import setup_logging, logger
+from .auth_config import AuthUtils, require_admin, require_viewer_or_admin, PasswordValidator, setup_environment_variables
+from pydantic import BaseModel
+from datetime import timedelta
 import os
 import time
 from starlette.requests import Request
@@ -206,8 +209,8 @@ def gender_ratio(db: Session = Depends(get_db)):
 
 @app.put('/voters/{voter_id}', response_model=schemas.VoterOut)
 @limiter.limit('100/minute')
-def update_voter(request: Request, voter_id: int, v: schemas.VoterUpdate, db: Session = Depends(get_db)):
-    """Update a voter record. (100 req/min limit)"""
+def update_voter(request: Request, voter_id: int, v: schemas.VoterUpdate, db: Session = Depends(get_db), current_user: dict = Depends(require_admin)):
+    """Update a voter record (admin only). (100 req/min limit)"""
     updated = crud.update_voter(db, voter_id, v)
     if not updated:
         logger.warning(f'Update failed: Voter ID {voter_id} not found')
@@ -217,9 +220,9 @@ def update_voter(request: Request, voter_id: int, v: schemas.VoterUpdate, db: Se
 
 
 @app.delete('/voters/{voter_id}')
-@limiter.limit('100/minute')
-def delete_voter(request: Request, voter_id: int, db: Session = Depends(get_db)):
-    """Delete a voter record. (100 req/min limit)"""
+@limiter.limit('50/minute')
+def delete_voter(request: Request, voter_id: int, db: Session = Depends(get_db), current_user: dict = Depends(require_admin)):
+    """Delete a voter record (admin only). (50 req/min limit)"""
     ok = crud.delete_voter(db, voter_id)
     if not ok:
         logger.warning(f'Delete failed: Voter ID {voter_id} not found')
@@ -298,25 +301,88 @@ def upload_pdf(request: Request, file: UploadFile = File(...), db: Session = Dep
 
 # ============= AUTHENTICATION ENDPOINTS =============
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class UserCreateRequest(BaseModel):
+    username: str
+    password: str
+    full_name: str = ""
+    role: str = "viewer"
+
+# Initialize auth environment
+setup_environment_variables()
+
 @app.post('/auth/login')
 @limiter.limit('10/minute')
-def login(request: Request, username: str, password: str, db: Session = Depends(get_db)):
-    """Authenticate user and return user details."""
-    logger.info(f'Login attempt for username: {username}')
+def login(request: Request, login_data: LoginRequest, db: Session = Depends(get_db)):
+    """Authenticate user with PostgreSQL database."""
+    logger.info(f'Login attempt for username: {login_data.username}')
     
-    user = crud.authenticate_user(db, username, password)
+    # Use PostgreSQL authentication
+    from .postgres_auth import authenticate_postgres_user
+    user = authenticate_postgres_user(db, login_data.username, login_data.password)
+    
     if not user:
-        logger.warning(f'Failed login attempt for username: {username}')
+        logger.warning(f'Failed login attempt for username: {login_data.username}')
         raise HTTPException(status_code=401, detail='Invalid username or password')
     
-    logger.info(f'Successful login: user_id={user.id}, username={username}, role={user.role}')
+    logger.info(f'Successful login: username={login_data.username}, role={user.role}')
+    
+    # Return response compatible with Streamlit
+    return {
+        'access_token': 'postgres-token-' + user.username,
+        'refresh_token': 'refresh-token-' + user.username,
+        'token_type': 'bearer',
+        'expires_in': 1800,
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'full_name': user.full_name,
+            'role': user.role,
+            'is_active': user.is_active
+        }
+    }
+
+
+@app.post('/auth/refresh')
+@limiter.limit('20/minute')
+def refresh_token(request: Request, refresh_token: str):
+    """Refresh access token using refresh token."""
+    payload = AuthUtils.verify_token(refresh_token, token_type="refresh")
+    if not payload:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
+    # Create new access token
+    token_data = {
+        "sub": payload["sub"],
+        "user_id": payload["user_id"], 
+        "role": payload["role"],
+        "full_name": payload["full_name"]
+    }
+    
+    new_access_token = AuthUtils.create_access_token(data=token_data)
     
     return {
-        'id': user.id,
-        'username': user.username,
-        'full_name': user.full_name,
-        'role': user.role,
-        'last_login': user.last_login
+        "access_token": new_access_token,
+        "token_type": "bearer",
+        "expires_in": 1800
+    }
+
+
+@app.get('/auth/me')
+def get_current_user_info(current_user: dict = Depends(require_viewer_or_admin)):
+    """Get current user information from token."""
+    return {
+        "username": current_user["username"],
+        "user_id": current_user["user_id"],
+        "role": current_user["role"],
+        "full_name": current_user["full_name"]
     }
 
 
@@ -324,15 +390,35 @@ def login(request: Request, username: str, password: str, db: Session = Depends(
 @limiter.limit('5/minute')
 def create_new_user(
     request: Request,
-    username: str,
-    password: str,
-    full_name: str = "",
-    role: str = "viewer",
-    db: Session = Depends(get_db)
+    user_data: UserCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_admin)
 ):
-    """Create a new user (admin only in production)."""
-    # Check if username already exists
-    existing_user = crud.get_user_by_username(db, username)
+    """Create a new user (admin only)."""
+    try:
+        new_user = crud.create_user(
+            db=db,
+            username=user_data.username,
+            password=user_data.password,
+            full_name=user_data.full_name,
+            role=user_data.role
+        )
+        
+        logger.info(f'New user created: {user_data.username} by admin: {current_user["username"]}')
+        
+        return {
+            'id': new_user.id,
+            'username': new_user.username,
+            'full_name': new_user.full_name,
+            'role': new_user.role,
+            'is_active': new_user.is_active,
+            'created_at': new_user.created_at
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f'User creation failed: {str(e)}')
+        raise HTTPException(status_code=500, detail='User creation failed')
     if existing_user:
         raise HTTPException(status_code=400, detail='Username already exists')
     

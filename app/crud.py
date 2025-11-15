@@ -2,11 +2,8 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 from typing import List, Dict, Optional
 from sqlalchemy import func
-from passlib.context import CryptContext
+from .auth_config import AuthUtils, PasswordValidator
 from datetime import datetime
-
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def create_voter(db: Session, voter: schemas.VoterCreate):
@@ -126,17 +123,31 @@ def filter_by_age_range(db: Session, min_age: int, max_age: int, limit: int = 10
 # ============= USER AUTHENTICATION FUNCTIONS =============
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain password against a hashed password."""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verify password against hash."""
+    return AuthUtils.verify_password(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password for storage."""
-    return pwd_context.hash(password)
+    return AuthUtils.get_password_hash(password)
 
 
 def create_user(db: Session, username: str, password: str, full_name: str = "", role: str = "viewer"):
     """Create a new user with hashed password."""
+    # Validate password strength
+    is_valid, message = PasswordValidator.validate_password(password)
+    if not is_valid:
+        raise ValueError(f"Password validation failed: {message}")
+    
+    # Check if user already exists
+    existing_user = get_user_by_username(db, username)
+    if existing_user:
+        raise ValueError(f"User with username '{username}' already exists")
+    
+    # Validate role
+    if role not in ["admin", "viewer"]:
+        raise ValueError(f"Invalid role '{role}'. Must be 'admin' or 'viewer'")
+    
     hashed_password = get_password_hash(password)
     db_user = models.User(
         username=username,

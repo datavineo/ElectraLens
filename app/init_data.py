@@ -67,10 +67,10 @@ def init_sample_data():
             voter = schemas.VoterCreate(**voter_data)
             crud.create_voter(db=db, voter=voter)
             
-        print("✅ Sample data initialized successfully")
+        print("[INIT] Sample data initialized successfully")
         
     except Exception as e:
-        print(f"❌ Error initializing sample data: {e}")
+        print(f"[ERROR] Error initializing sample data: {e}")
     finally:
         db.close()
 

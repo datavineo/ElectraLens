@@ -7,13 +7,36 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 import os
 
-# Load API base URL from secrets or use deployed backend
-try:
-    API_BASE = st.secrets.get('API_BASE', 'https://electra-lens.vercel.app')
-except FileNotFoundError:
-    # For production deployment, use environment variable or default to working Vercel URL
-    API_BASE = os.getenv('API_BASE', 'https://electra-lens.vercel.app')
-    # ✅ Verified working API URL: https://electra-lens.vercel.app
+# Production-ready API configuration
+def get_api_base_url():
+    """Determine the API base URL based on environment."""
+    # Check environment variables first
+    if os.getenv('BACKEND_URL'):
+        return os.getenv('BACKEND_URL')
+    
+    # Check Streamlit secrets for production
+    try:
+        return st.secrets.get('API_BASE', 'https://electra-lens.vercel.app')
+    except FileNotFoundError:
+        pass
+    
+    # Auto-detection for local development
+    LOCAL_API = os.getenv('LOCAL_BACKEND', 'http://localhost:8000')
+    PROD_API = 'https://electra-lens.vercel.app'
+    
+    # Try to connect to local backend first
+    try:
+        response = requests.get(f"{LOCAL_API}/health", timeout=2)
+        if response.status_code == 200:
+            print(f"[STREAMLIT] Using local backend: {LOCAL_API}")
+            return LOCAL_API
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        pass
+    
+    print(f"[STREAMLIT] Using production backend: {PROD_API}")
+    return PROD_API
+
+API_BASE = get_api_base_url()
 
 # Configure session timeout and connection pooling
 session = requests.Session()
@@ -368,18 +391,27 @@ def login_page():
                     st.error("⚠️ Please enter both username and password")
                 else:
                     try:
-                        # Call login API
+                        # Call JWT login API
+                        login_data = {
+                            "username": username,
+                            "password": password
+                        }
                         response = session.post(
                             f'{API_BASE}/auth/login',
-                            params={'username': username, 'password': password},
+                            json=login_data,
                             timeout=5
                         )
                         
                         if response.status_code == 200:
-                            user_data = response.json()
+                            auth_data = response.json()
+                            # Store JWT tokens and user info
                             st.session_state.logged_in = True
-                            st.session_state.user = user_data
-                            st.success(f"✅ Welcome back, {user_data['full_name'] or username}!")
+                            st.session_state.access_token = auth_data['access_token']
+                            st.session_state.refresh_token = auth_data['refresh_token']
+                            st.session_state.user = auth_data['user']
+                            
+                            user_name = auth_data['user'].get('full_name') or username
+                            st.success(f"✅ Welcome back, {user_name}!")
                             time.sleep(0.5)
                             st.rerun()
                         else:
@@ -394,7 +426,38 @@ def logout():
     """Logout user and clear session."""
     st.session_state.logged_in = False
     st.session_state.user = None
+    st.session_state.access_token = None
+    st.session_state.refresh_token = None
     st.rerun()
+
+
+def get_auth_headers():
+    """Get authorization headers with JWT token."""
+    if st.session_state.get('access_token'):
+        return {"Authorization": f"Bearer {st.session_state.access_token}"}
+    return {}
+
+
+def refresh_access_token():
+    """Refresh access token using refresh token."""
+    if not st.session_state.get('refresh_token'):
+        return False
+    
+    try:
+        response = session.post(
+            f'{API_BASE}/auth/refresh',
+            json={"refresh_token": st.session_state.refresh_token},
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            token_data = response.json()
+            st.session_state.access_token = token_data['access_token']
+            return True
+    except:
+        pass
+    
+    return False
 
 
 def check_permission(required_role='viewer'):
@@ -979,7 +1042,18 @@ st.markdown(f"""
 if tab == '📊 Summary':
     # Display key metrics at the top
     with st.spinner('Loading summary data...'):
-        resp = session.get(f'{API_BASE}/voters/summary', timeout=5)
+        headers = get_auth_headers()
+        resp = session.get(f'{API_BASE}/voters/summary', headers=headers, timeout=5)
+        
+        if resp.status_code == 401:
+            if refresh_access_token():
+                headers = get_auth_headers()
+                resp = session.get(f'{API_BASE}/voters/summary', headers=headers, timeout=5)
+        
+        if resp.status_code != 200:
+            st.error("Failed to load summary data. Please check your authentication.")
+            st.stop()
+            
         data = resp.json()
         df = pd.DataFrame(data)
         
@@ -987,7 +1061,11 @@ if tab == '📊 Summary':
         total_voters = df['count'].sum() if not df.empty else 0
         
         # Get gender data
-        gr = session.get(f'{API_BASE}/voters/gender-ratio', timeout=5).json()
+        gr_resp = session.get(f'{API_BASE}/voters/gender-ratio', headers=headers, timeout=5)
+        if gr_resp.status_code == 200:
+            gr = gr_resp.json()
+        else:
+            gr = {}
         male_count = gr.get('M', 0)
         female_count = gr.get('F', 0)
         

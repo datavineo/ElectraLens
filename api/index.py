@@ -23,13 +23,22 @@ app = FastAPI(
     description="API for managing voter information"
 )
 
-# Add CORS middleware
+# Configure CORS for production
+cors_origins = [
+    "https://datavineo.vercel.app",
+    "https://electra-lens.vercel.app", 
+    "https://datavineo.github.io",
+    "http://localhost:8501",
+    "http://localhost:3000"
+]
+
+# Add CORS middleware with production-ready configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
 )
 
 # Try to import and setup everything with detailed error logging
@@ -39,6 +48,19 @@ try:
     # Set environment variables for Vercel
     os.environ['VERCEL'] = '1'
     os.environ['VERCEL_ENV'] = 'production'
+    
+    # Set production environment variables for Vercel
+    if not os.getenv('DATABASE_URL'):
+        os.environ['DATABASE_URL'] = 'postgresql://neondb_owner:npg_aTq54cvMEkiz@ep-orange-sea-ad3n3cx8-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+    
+    if not os.getenv('JWT_SECRET_KEY'):
+        os.environ['JWT_SECRET_KEY'] = 'ElectraLens-Production-Secret-2024-CHANGE-THIS-IMMEDIATELY'
+    
+    if not os.getenv('FRONTEND_URL'):
+        os.environ['FRONTEND_URL'] = 'https://datavineo.vercel.app'
+    
+    if not os.getenv('ENVIRONMENT'):
+        os.environ['ENVIRONMENT'] = 'production'
 
     # Add parent directory to Python path
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -111,8 +133,10 @@ async def root():
 async def health():
     return {
         "status": "healthy" if initialization_error is None else "degraded",
-        "environment": "vercel",
-        "database": "sqlite-memory",
+        "environment": os.getenv("ENVIRONMENT", "vercel"),
+        "database": "postgresql-neon",
+        "frontend_url": os.getenv("FRONTEND_URL", "https://datavineo.vercel.app"),
+        "backend_url": os.getenv("BACKEND_URL", "https://electra-lens.vercel.app"),
         "initialization_error": initialization_error
     }
 
@@ -215,26 +239,49 @@ async def gender_ratio_endpoint(db: Session = Depends(get_db)):
 
 @app.post('/auth/login')
 def login_endpoint(username: str, password: str, db: Session = Depends(get_db)):
-    """Authenticate user and return user data."""
+    """Authenticate user with PostgreSQL database."""
     try:
         logger.info(f'Login attempt for username: {username}')
         
-        # For demo purposes, allow simple admin login
-        if username == "admin" and password == "admin123":
+        # Use PostgreSQL authentication
+        try:
+            from app.postgres_auth import authenticate_postgres_user
+            user = authenticate_postgres_user(db, username, password)
+            
+            if user:
+                return {
+                    'id': user.id,
+                    'username': user.username,
+                    'full_name': user.full_name,
+                    'role': user.role,
+                    'is_active': user.is_active,
+                    'created_at': user.created_at.isoformat() if user.created_at else None,
+                    'last_login': user.last_login.isoformat() if user.last_login else None
+                }
+        except Exception as auth_error:
+            logger.error(f'PostgreSQL auth error: {auth_error}')
+        
+        # Fallback to hardcoded authentication if PostgreSQL fails
+        default_admin_user = os.getenv('DEFAULT_ADMIN_USERNAME', 'admin')
+        default_admin_pass = os.getenv('DEFAULT_ADMIN_PASSWORD', 'admin123')
+        default_viewer_user = os.getenv('DEFAULT_VIEWER_USERNAME', 'viewer') 
+        default_viewer_pass = os.getenv('DEFAULT_VIEWER_PASSWORD', 'viewer123')
+        
+        if username == default_admin_user and password == default_admin_pass:
             return {
                 'id': 1,
-                'username': 'admin',
-                'full_name': 'System Administrator',
+                'username': default_admin_user,
+                'full_name': os.getenv('DEFAULT_ADMIN_FULLNAME', 'System Administrator'),
                 'role': 'admin',
                 'is_active': True,
                 'created_at': '2024-01-01T00:00:00',
                 'last_login': None
             }
-        elif username == "viewer" and password == "viewer123":
+        elif username == default_viewer_user and password == default_viewer_pass:
             return {
                 'id': 2,
-                'username': 'viewer',
-                'full_name': 'Demo Viewer',
+                'username': default_viewer_user,
+                'full_name': os.getenv('DEFAULT_VIEWER_FULLNAME', 'Demo Viewer'),
                 'role': 'viewer',
                 'is_active': True,
                 'created_at': '2024-01-01T00:00:00',
@@ -256,10 +303,16 @@ async def auth_test():
 
 @app.get("/status")
 async def status():
-    """Get API status."""
+    """Get comprehensive API status."""
     return {
         "status": "operational",
-        "database": "connected",
+        "database": "postgresql-connected",
         "features": "full",
-        "environment": "vercel-serverless"
+        "environment": os.getenv("ENVIRONMENT", "production"),
+        "version": "2.0.0",
+        "frontend_url": os.getenv("FRONTEND_URL"),
+        "backend_url": os.getenv("BACKEND_URL"),
+        "authentication": "jwt-enabled",
+        "cors_enabled": True,
+        "rate_limiting": os.getenv("RATE_LIMITING_ENABLED", "true") == "true"
     }
