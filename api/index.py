@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
 from typing import TYPE_CHECKING, List
 import os
@@ -238,7 +238,10 @@ async def gender_ratio_endpoint(db: Session = Depends(get_db)):
 
 
 @app.post('/login')
-async def login_endpoint_simple(username: str, password: str):
+async def login_endpoint_simple(
+    username: str = Form(...), 
+    password: str = Form(...)
+):
     """Simple authentication endpoint that works in all environments."""
     try:
         logger.info(f'Login attempt for username: {username}')
@@ -288,7 +291,10 @@ async def login_endpoint_simple(username: str, password: str):
 
 
 @app.post('/auth/login')
-async def login_endpoint_auth(username: str, password: str):
+async def login_endpoint_auth(
+    username: str = Form(...), 
+    password: str = Form(...)
+):
     """Authentication endpoint with full database integration."""
     try:
         logger.info(f'Login attempt for username: {username}')
