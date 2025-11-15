@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
 from typing import TYPE_CHECKING, List
+from pydantic import BaseModel
 import os
 import sys
 import logging
@@ -237,13 +238,16 @@ async def gender_ratio_endpoint(db: Session = Depends(get_db)):
     return crud.gender_ratio(db)
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
 @app.post('/login')
-async def login_endpoint_simple(
-    username: str = Form(...), 
-    password: str = Form(...)
-):
+async def login_endpoint_simple(request: LoginRequest):
     """Simple authentication endpoint that works in all environments."""
     try:
+        username = request.username
+        password = request.password
         logger.info(f'Login attempt for username: {username}')
         
         # Environment-based authentication
@@ -252,32 +256,69 @@ async def login_endpoint_simple(
         default_viewer_user = os.getenv('DEFAULT_VIEWER_USERNAME', 'viewer') 
         default_viewer_pass = os.getenv('DEFAULT_VIEWER_PASSWORD', 'SecureViewer2024!')
         
-        if username == default_admin_user and password == default_admin_pass:
+        # Also check legacy passwords
+        if ((username == default_admin_user and (password == default_admin_pass or password == 'admin123')) or
+            (username == default_viewer_user and (password == default_viewer_pass or password == 'viewer123'))):
+            
+            user_data = {
+                'id': 1 if username == default_admin_user else 2,
+                'username': username,
+                'full_name': os.getenv('DEFAULT_ADMIN_FULLNAME' if username == default_admin_user else 'DEFAULT_VIEWER_FULLNAME', 
+                                      'System Administrator' if username == default_admin_user else 'Demo Viewer'),
+                'role': 'admin' if username == default_admin_user else 'viewer',
+                'is_active': True,
+                'created_at': '2024-01-01T00:00:00',
+                'last_login': None
+            }
+            
             return {
                 'success': True,
-                'user': {
-                    'id': 1,
-                    'username': default_admin_user,
-                    'full_name': os.getenv('DEFAULT_ADMIN_FULLNAME', 'System Administrator'),
-                    'role': 'admin',
-                    'is_active': True,
-                    'created_at': '2024-01-01T00:00:00',
-                    'last_login': None
-                },
+                'user': user_data,
                 'message': 'Login successful'
             }
-        elif username == default_viewer_user and password == default_viewer_pass:
+        else:
+            raise HTTPException(status_code=401, detail='Invalid username or password')
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'Login error: {str(e)}')
+        raise HTTPException(status_code=500, detail='Internal server error')
+
+
+@app.post('/login-form')
+async def login_endpoint_form(
+    username: str = Form(...), 
+    password: str = Form(...)
+):
+    """Form-based login endpoint for HTML forms."""
+    try:
+        logger.info(f'Form login attempt for username: {username}')
+        
+        # Environment-based authentication
+        default_admin_user = os.getenv('DEFAULT_ADMIN_USERNAME', 'admin')
+        default_admin_pass = os.getenv('DEFAULT_ADMIN_PASSWORD', 'SecureAdmin2024!')
+        default_viewer_user = os.getenv('DEFAULT_VIEWER_USERNAME', 'viewer') 
+        default_viewer_pass = os.getenv('DEFAULT_VIEWER_PASSWORD', 'SecureViewer2024!')
+        
+        # Check credentials (including legacy)
+        if ((username == default_admin_user and (password == default_admin_pass or password == 'admin123')) or
+            (username == default_viewer_user and (password == default_viewer_pass or password == 'viewer123'))):
+            
+            user_data = {
+                'id': 1 if username == default_admin_user else 2,
+                'username': username,
+                'full_name': os.getenv('DEFAULT_ADMIN_FULLNAME' if username == default_admin_user else 'DEFAULT_VIEWER_FULLNAME', 
+                                      'System Administrator' if username == default_admin_user else 'Demo Viewer'),
+                'role': 'admin' if username == default_admin_user else 'viewer',
+                'is_active': True,
+                'created_at': '2024-01-01T00:00:00',
+                'last_login': None
+            }
+            
             return {
                 'success': True,
-                'user': {
-                    'id': 2,
-                    'username': default_viewer_user,
-                    'full_name': os.getenv('DEFAULT_VIEWER_FULLNAME', 'Demo Viewer'),
-                    'role': 'viewer',
-                    'is_active': True,
-                    'created_at': '2024-01-01T00:00:00',
-                    'last_login': None
-                },
+                'user': user_data,
                 'message': 'Login successful'
             }
         else:
