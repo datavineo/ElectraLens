@@ -58,3 +58,4 @@ COMPLETE_PROJECT_ANALYSIS.md
 .streamlit/secrets.toml
 EXECUTIVE_SUMMARY.md
 .env
+.vercel
