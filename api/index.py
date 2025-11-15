@@ -110,84 +110,203 @@ async def debug():
     }
 
 
-# Voter CRUD endpoints
-@app.post("/voters", response_model=schemas.VoterOut)
-async def create_voter_endpoint(voter: schemas.VoterCreate, db: Session = Depends(get_db)):
+# Voter CRUD endpoints (simplified to avoid import issues)
+@app.post("/voters")
+async def create_voter_endpoint(voter: dict):
     """Create a new voter record."""
     try:
-        return crud.create_voter(db=db, voter=voter)
+        # Try to import at runtime
+        from app import crud, schemas
+        from app.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            # Convert dict to schema object
+            voter_obj = schemas.VoterCreate(**voter)
+            result = crud.create_voter(db=db, voter=voter_obj)
+            return result.__dict__ if hasattr(result, '__dict__') else result
+        finally:
+            db.close()
     except Exception as e:
         logger.error(f"Error creating voter: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/voters", response_model=List[schemas.VoterOut])
-async def list_voters_endpoint(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+@app.get("/voters")
+async def list_voters_endpoint(skip: int = 0, limit: int = 100):
     """List all voters with pagination."""
     try:
-        return crud.list_voters(db, skip=skip, limit=limit)
+        from app import crud
+        from app.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            voters = crud.list_voters(db, skip=skip, limit=limit)
+            return [v.__dict__ if hasattr(v, '__dict__') else v for v in voters]
+        finally:
+            db.close()
     except Exception as e:
         logger.error(f"Error listing voters: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/voters/{voter_id}", response_model=schemas.VoterOut)
-async def get_voter_endpoint(voter_id: int, db: Session = Depends(get_db)):
+@app.get("/voters/{voter_id}")
+async def get_voter_endpoint(voter_id: int):
     """Get a specific voter by ID."""
-    voter = crud.get_voter(db, voter_id=voter_id)
-    if voter is None:
-        raise HTTPException(status_code=404, detail="Voter not found")
-    return voter
+    try:
+        from app import crud
+        from app.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            voter = crud.get_voter(db, voter_id=voter_id)
+            if voter is None:
+                raise HTTPException(status_code=404, detail="Voter not found")
+            return voter.__dict__ if hasattr(voter, '__dict__') else voter
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting voter: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.put("/voters/{voter_id}", response_model=schemas.VoterOut)
-async def update_voter_endpoint(voter_id: int, voter: schemas.VoterUpdate, db: Session = Depends(get_db)):
+@app.put("/voters/{voter_id}")
+async def update_voter_endpoint(voter_id: int, voter: dict):
     """Update a voter record."""
-    updated = crud.update_voter(db=db, voter_id=voter_id, v=voter)
-    if not updated:
-        raise HTTPException(status_code=404, detail="Voter not found")
-    return updated
+    try:
+        from app import crud, schemas
+        from app.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            voter_obj = schemas.VoterUpdate(**voter)
+            updated = crud.update_voter(db=db, voter_id=voter_id, v=voter_obj)
+            if not updated:
+                raise HTTPException(status_code=404, detail="Voter not found")
+            return updated.__dict__ if hasattr(updated, '__dict__') else updated
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating voter: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.delete("/voters/{voter_id}")
-async def delete_voter_endpoint(voter_id: int, db: Session = Depends(get_db)):
+async def delete_voter_endpoint(voter_id: int):
     """Delete a voter record."""
-    success = crud.delete_voter(db=db, voter_id=voter_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Voter not found")
-    return {"message": "Voter deleted successfully", "ok": True}
+    try:
+        from app import crud
+        from app.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            success = crud.delete_voter(db=db, voter_id=voter_id)
+            if not success:
+                raise HTTPException(status_code=404, detail="Voter not found")
+            return {"message": "Voter deleted successfully", "ok": True}
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting voter: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/voters/search/query", response_model=List[schemas.VoterOut])
-async def search_voters_endpoint(q: str, limit: int = 100, db: Session = Depends(get_db)):
+@app.get("/voters/search/query")
+async def search_voters_endpoint(q: str, limit: int = 100):
     """Search voters by name, constituency, or booth number."""
-    if len(q) < 2:
-        raise HTTPException(status_code=400, detail="Search query must be at least 2 characters")
-    return crud.search_voters(db, query=q, limit=limit)
+    try:
+        if len(q) < 2:
+            raise HTTPException(status_code=400, detail="Search query must be at least 2 characters")
+            
+        from app import crud
+        from app.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            voters = crud.search_voters(db, query=q, limit=limit)
+            return [v.__dict__ if hasattr(v, '__dict__') else v for v in voters]
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error searching voters: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/voters/summary")
-async def voters_summary_endpoint(db: Session = Depends(get_db)):
+async def voters_summary_endpoint():
     """Get summary of voters by constituency."""
-    return crud.summary_by_constituency(db)
+    try:
+        from app import crud
+        from app.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            return crud.summary_by_constituency(db)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error getting summary: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/voters/constituency/{name}", response_model=List[schemas.VoterOut])
-async def voters_in_constituency_endpoint(name: str, db: Session = Depends(get_db)):
+@app.get("/voters/constituency/{name}")
+async def voters_in_constituency_endpoint(name: str):
     """Get all voters in a specific constituency."""
-    return crud.voters_in_constituency(db, name)
+    try:
+        from app import crud
+        from app.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            voters = crud.voters_in_constituency(db, name)
+            return [v.__dict__ if hasattr(v, '__dict__') else v for v in voters]
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error getting constituency voters: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/voters/stats/age-distribution")
-async def age_distribution_endpoint(db: Session = Depends(get_db)):
+async def age_distribution_endpoint():
     """Get age distribution of voters."""
-    return crud.age_distribution(db)
+    try:
+        from app import crud
+        from app.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            return crud.age_distribution(db)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error getting age distribution: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/voters/stats/gender-ratio")
-async def gender_ratio_endpoint(db: Session = Depends(get_db)):
+async def gender_ratio_endpoint():
     """Get gender ratio of voters."""
-    return crud.gender_ratio(db)
+    try:
+        from app import crud
+        from app.database import SessionLocal
+        
+        db = SessionLocal()
+        try:
+            return crud.gender_ratio(db)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"Error getting gender ratio: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 class LoginRequest(BaseModel):
@@ -383,11 +502,7 @@ def get_db_fallback():
         logger.error(f"Database session error: {e}")
         raise HTTPException(status_code=503, detail="Database unavailable")
 
-# Try to import get_db, use fallback if not available
-try:
-    from app.database import get_db
-except ImportError:
-    get_db = get_db_fallback
+# Database imports are now handled at runtime in each endpoint
 
 # Database initialization (moved to end to not interfere with endpoint registration)
 def initialize_database():
