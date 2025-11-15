@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Depends, Form
 from fastapi.middleware.cors import CORSMiddleware
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Any
 from pydantic import BaseModel
 import os
 import sys
@@ -75,9 +75,13 @@ async def root():
     # Count authentication endpoints
     auth_routes = []
     for route in app.routes:
-        if hasattr(route, 'path') and hasattr(route, 'methods'):
-            if 'login' in route.path or 'auth' in route.path:
-                auth_routes.append(f"{list(route.methods)} {route.path}")
+        # Safe attribute access with getattr to avoid Pylance type errors
+        route_path = getattr(route, 'path', None)
+        route_methods = getattr(route, 'methods', None)
+        
+        if route_path and route_methods:
+            if 'login' in route_path or 'auth' in route_path:
+                auth_routes.append(f"{list(route_methods)} {route_path}")
     
     return {
         "message": "ElectraLens API - Complete Authentication System",
