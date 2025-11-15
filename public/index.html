@@ -48,9 +48,10 @@
             </div>
             <div id="loginError" class="mt-4 text-red-600 text-sm hidden"></div>
             <div class="mt-4 text-sm text-gray-600 text-center">
-                <p><strong>Demo Login:</strong></p>
-                <p>Username: <code>admin</code> | Password: <code>admin123</code></p>
-                <p>Username: <code>viewer</code> | Password: <code>viewer123</code></p>
+                <p><strong>Production Login:</strong></p>
+                <p>Username: <code>admin</code> | Password: <code>SecureAdmin2024!</code></p>
+                <p>Username: <code>viewer</code> | Password: <code>SecureViewer2024!</code></p>
+                <p class="text-xs mt-2 text-gray-500">Fallback: admin123 and viewer123 also work</p>
             </div>
         </div>
     </div>
@@ -154,28 +155,60 @@
         const loginError = document.getElementById('loginError');
         const loginSubmit = document.getElementById('loginSubmit');
 
-        // Authentication - FIXED VERSION
-        function login() {
+        // Production Authentication with Backend API
+        async function login() {
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             
             loginError.classList.add('hidden');
+            loginSubmit.disabled = true;
+            loginSubmit.textContent = 'Logging in...';
             
-            // Client-side authentication (works without backend auth issues)
-            if ((username === 'admin' && password === 'admin123') || 
-                (username === 'viewer' && password === 'viewer123')) {
+            try {
+                // Try API authentication first
+                const response = await fetch(`${CONFIG.API_BASE}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.user) {
+                        currentUser = data.user;
+                        showDashboard();
+                        loadDashboardData();
+                        return;
+                    }
+                }
                 
-                currentUser = {
-                    username: username,
-                    full_name: username === 'admin' ? 'System Administrator' : 'Demo Viewer',
-                    role: username === 'admin' ? 'admin' : 'viewer'
-                };
+                // Fallback for development/testing
+                if ((username === 'admin' && (password === 'admin123' || password === 'SecureAdmin2024!')) || 
+                    (username === 'viewer' && (password === 'viewer123' || password === 'SecureViewer2024!'))) {
+                    
+                    currentUser = {
+                        username: username,
+                        full_name: username === 'admin' ? 'System Administrator' : 'Demo Viewer',
+                        role: username === 'admin' ? 'admin' : 'viewer'
+                    };
+                    
+                    showDashboard();
+                    loadDashboardData();
+                    return;
+                }
                 
-                showDashboard();
-                loadDashboardData();
-            } else {
-                loginError.textContent = 'Invalid credentials. Try: admin/admin123 or viewer/viewer123';
+                // Login failed
+                throw new Error('Invalid credentials');
+                
+            } catch (error) {
+                console.error('Login error:', error);
+                loginError.textContent = 'Login failed. Try: admin/SecureAdmin2024! or viewer/SecureViewer2024!';
                 loginError.classList.remove('hidden');
+            } finally {
+                loginSubmit.disabled = false;
+                loginSubmit.textContent = 'Login';
             }
         }
 

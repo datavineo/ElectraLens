@@ -237,62 +237,132 @@ async def gender_ratio_endpoint(db: Session = Depends(get_db)):
     return crud.gender_ratio(db)
 
 
-@app.post('/auth/login')
-def login_endpoint(username: str, password: str, db: Session = Depends(get_db)):
-    """Authenticate user with PostgreSQL database."""
+@app.post('/login')
+async def login_endpoint_simple(username: str, password: str):
+    """Simple authentication endpoint that works in all environments."""
     try:
         logger.info(f'Login attempt for username: {username}')
         
-        # Use PostgreSQL authentication
-        try:
-            from app.postgres_auth import authenticate_postgres_user
-            user = authenticate_postgres_user(db, username, password)
-            
-            if user:
-                return {
-                    'id': user.id,
-                    'username': user.username,
-                    'full_name': user.full_name,
-                    'role': user.role,
-                    'is_active': user.is_active,
-                    'created_at': user.created_at.isoformat() if user.created_at else None,
-                    'last_login': user.last_login.isoformat() if user.last_login else None
-                }
-        except Exception as auth_error:
-            logger.error(f'PostgreSQL auth error: {auth_error}')
-        
-        # Fallback to hardcoded authentication if PostgreSQL fails
+        # Environment-based authentication
         default_admin_user = os.getenv('DEFAULT_ADMIN_USERNAME', 'admin')
-        default_admin_pass = os.getenv('DEFAULT_ADMIN_PASSWORD', 'admin123')
+        default_admin_pass = os.getenv('DEFAULT_ADMIN_PASSWORD', 'SecureAdmin2024!')
         default_viewer_user = os.getenv('DEFAULT_VIEWER_USERNAME', 'viewer') 
-        default_viewer_pass = os.getenv('DEFAULT_VIEWER_PASSWORD', 'viewer123')
+        default_viewer_pass = os.getenv('DEFAULT_VIEWER_PASSWORD', 'SecureViewer2024!')
         
         if username == default_admin_user and password == default_admin_pass:
             return {
-                'id': 1,
-                'username': default_admin_user,
-                'full_name': os.getenv('DEFAULT_ADMIN_FULLNAME', 'System Administrator'),
-                'role': 'admin',
-                'is_active': True,
-                'created_at': '2024-01-01T00:00:00',
-                'last_login': None
+                'success': True,
+                'user': {
+                    'id': 1,
+                    'username': default_admin_user,
+                    'full_name': os.getenv('DEFAULT_ADMIN_FULLNAME', 'System Administrator'),
+                    'role': 'admin',
+                    'is_active': True,
+                    'created_at': '2024-01-01T00:00:00',
+                    'last_login': None
+                },
+                'message': 'Login successful'
             }
         elif username == default_viewer_user and password == default_viewer_pass:
             return {
-                'id': 2,
-                'username': default_viewer_user,
-                'full_name': os.getenv('DEFAULT_VIEWER_FULLNAME', 'Demo Viewer'),
-                'role': 'viewer',
-                'is_active': True,
-                'created_at': '2024-01-01T00:00:00',
-                'last_login': None
+                'success': True,
+                'user': {
+                    'id': 2,
+                    'username': default_viewer_user,
+                    'full_name': os.getenv('DEFAULT_VIEWER_FULLNAME', 'Demo Viewer'),
+                    'role': 'viewer',
+                    'is_active': True,
+                    'created_at': '2024-01-01T00:00:00',
+                    'last_login': None
+                },
+                'message': 'Login successful'
             }
         else:
             raise HTTPException(status_code=401, detail='Invalid username or password')
             
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f'Login error: {str(e)}')
-        raise HTTPException(status_code=401, detail='Invalid username or password')
+        raise HTTPException(status_code=500, detail='Internal server error')
+
+
+@app.post('/auth/login')
+async def login_endpoint_auth(username: str, password: str):
+    """Authentication endpoint with full database integration."""
+    try:
+        logger.info(f'Login attempt for username: {username}')
+        
+        # Try database authentication first (if available)
+        try:
+            # Import at runtime to avoid issues in serverless environment
+            db_session = SessionLocal()
+            
+            # Try PostgreSQL authentication
+            from app.postgres_auth import authenticate_postgres_user
+            user = authenticate_postgres_user(db_session, username, password)
+            
+            if user:
+                db_session.close()
+                return {
+                    'success': True,
+                    'user': {
+                        'id': user.id,
+                        'username': user.username,
+                        'full_name': user.full_name,
+                        'role': user.role,
+                        'is_active': user.is_active,
+                        'created_at': user.created_at.isoformat() if user.created_at else None,
+                        'last_login': user.last_login.isoformat() if user.last_login else None
+                    },
+                    'message': 'Login successful'
+                }
+            db_session.close()
+        except Exception as auth_error:
+            logger.error(f'Database auth error: {auth_error}')
+        
+        # Fallback to environment variables
+        default_admin_user = os.getenv('DEFAULT_ADMIN_USERNAME', 'admin')
+        default_admin_pass = os.getenv('DEFAULT_ADMIN_PASSWORD', 'SecureAdmin2024!')
+        default_viewer_user = os.getenv('DEFAULT_VIEWER_USERNAME', 'viewer') 
+        default_viewer_pass = os.getenv('DEFAULT_VIEWER_PASSWORD', 'SecureViewer2024!')
+        
+        if username == default_admin_user and password == default_admin_pass:
+            return {
+                'success': True,
+                'user': {
+                    'id': 1,
+                    'username': default_admin_user,
+                    'full_name': os.getenv('DEFAULT_ADMIN_FULLNAME', 'System Administrator'),
+                    'role': 'admin',
+                    'is_active': True,
+                    'created_at': '2024-01-01T00:00:00',
+                    'last_login': None
+                },
+                'message': 'Login successful'
+            }
+        elif username == default_viewer_user and password == default_viewer_pass:
+            return {
+                'success': True,
+                'user': {
+                    'id': 2,
+                    'username': default_viewer_user,
+                    'full_name': os.getenv('DEFAULT_VIEWER_FULLNAME', 'Demo Viewer'),
+                    'role': 'viewer',
+                    'is_active': True,
+                    'created_at': '2024-01-01T00:00:00',
+                    'last_login': None
+                },
+                'message': 'Login successful'
+            }
+        else:
+            raise HTTPException(status_code=401, detail='Invalid username or password')
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f'Login error: {str(e)}')
+        raise HTTPException(status_code=500, detail='Internal server error')
 
 
 @app.get("/auth/test")
