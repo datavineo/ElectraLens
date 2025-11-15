@@ -1,0 +1,29 @@
+# ElectraLens - Render Deployment Requirements
+# Optimized for Python 3.11/3.12 compatibility and Render platform
+
+# Core Streamlit
+streamlit==1.29.0
+requests==2.31.0
+pandas==2.2.2
+plotly==5.20.0
+
+# Essential dependencies for Streamlit
+altair>=4.2.0
+numpy>=1.21.0
+pillow>=8.0.0
+pyarrow>=10.0.0
+python-dateutil>=2.8.0
+toml>=0.10.0
+typing-extensions>=4.3.0
+tzlocal>=4.0.0
+validators>=0.20.0
+
+# API client dependencies
+httpx>=0.24.0
+tenacity>=8.0.0
+
+# Optional: Authentication (if needed)
+# python-jose[cryptography]==3.5.0
+
+# Note: Backend dependencies (FastAPI, SQLAlchemy, etc.) are not needed
+# for Streamlit-only deployment as it connects to external API
